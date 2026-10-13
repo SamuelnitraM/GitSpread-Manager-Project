@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GitSpread.App/GitSpread.App.csproj" />
+    <Project Path="src/GitSpread.Core/GitSpread.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GitSpread.Tests/GitSpread.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,55 @@
+using GitSpread.Core.Accounts;
+using GitSpread.Core.Git;
+using GitSpread.Core.Settings;
+
+namespace GitSpread.App.ViewModels;
+
+/// <summary>Ce qu'un projet de la liste peut demander à la fenêtre principale.</summary>
+public interface IProjectHost
+{
+    AppServices Services { get; }
+    IDialogService Dialogs { get; }
+    IReadOnlyList<GitHubAccount> Accounts { get; }
+    AppSettings Settings { get; }
+    void SaveSettings();
+
+    /// <summary>Relance l'analyse (le projet a pu changer d'onglet) puis le resélectionne.</summary>
+    Task RescanAsync(string? revealPath = null);
+
+    Task RemoveExtraProjectAsync(string path);
+}
+
+/// <summary>Fenêtres modales, ouvertes par l'interface (les ViewModels ne connaissent pas WPF).</summary>
+public interface IDialogService
+{
+    bool ShowCommit(CommitViewModel viewModel);
+    void ShowPublish(PublishViewModel viewModel);
+    bool ShowIntegration(IntegrationViewModel viewModel);
+    void ShowRepoint(RepointViewModel viewModel);
+    bool Confirm(string message, string title);
+
+    /// <summary>Choix parmi plusieurs réponses : index choisi, ou -1 si annulé.</summary>
+    int Choose(string title, string message, IReadOnlyList<string> options);
+
+    /// <summary>Saisie d'un texte court : null si annulé.</summary>
+    string? Prompt(string title, string message, string initialValue);
+}
+
+/// <summary>Compte rendu de la dernière action lancée sur un projet : commandes, résultat en clair, sortie brute.</summary>
+public sealed record ActionLog(string Title, bool Succeeded, string Message, string Commands, string Output)
+{
+    public bool HasOutput => Output.Length > 0;
+    public string Icon => Succeeded ? "" : "";
+
+    public static ActionLog From(string title, IReadOnlyList<GitResult> results, string successMessage)
+    {
+        var failed = results.FirstOrDefault(r => !r.Succeeded);
+        var output = string.Join("\n", results.Select(r => r.Output).Where(o => o.Length > 0));
+        var message = failed is null
+            ? successMessage
+            : failed.Explanation ?? (failed.Output.Split('\n').FirstOrDefault(l => l.Trim().Length > 0)?.Trim() ?? "Échec sans message.");
+        return new ActionLog(title, failed is null, message, string.Join("\n", results.Select(r => r.Command)), output);
+    }
+
+    public static ActionLog Failure(string title, string message, string commands = "") => new(title, false, message, commands, "");
+}

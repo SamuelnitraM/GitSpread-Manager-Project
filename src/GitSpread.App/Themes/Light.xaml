@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Palette claire. Mêmes clés que Dark.xaml : toujours référencées en DynamicResource. -->
+    <SolidColorBrush x:Key="Bg" Color="#F6F7F9" />
+    <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAlt" Color="#F6F8FA" />
+    <SolidColorBrush x:Key="Border" Color="#E1E4E8" />
+    <SolidColorBrush x:Key="Text" Color="#1F2328" />
+    <SolidColorBrush x:Key="Muted" Color="#656D76" />
+    <SolidColorBrush x:Key="Accent" Color="#2563EB" />
+    <SolidColorBrush x:Key="AccentSoft" Color="#E8EFFD" />
+    <!-- Fond des boutons principaux : texte blanc lisible (contraste ≥ 4.5:1) -->
+    <SolidColorBrush x:Key="AccentButton" Color="#2563EB" />
+    <SolidColorBrush x:Key="Success" Color="#1A7F37" />
+    <SolidColorBrush x:Key="SuccessSoft" Color="#DAFBE1" />
+    <SolidColorBrush x:Key="SuccessBorder" Color="#B7E4C2" />
+    <SolidColorBrush x:Key="Warning" Color="#9A6700" />
+    <SolidColorBrush x:Key="WarningSoft" Color="#FFF8C5" />
+    <SolidColorBrush x:Key="Danger" Color="#CF222E" />
+    <SolidColorBrush x:Key="DangerSoft" Color="#FFEBE9" />
+    <SolidColorBrush x:Key="DangerBorder" Color="#F5C2C0" />
+    <SolidColorBrush x:Key="SegmentBg" Color="#EDEFF2" />
+    <SolidColorBrush x:Key="TabHover" Color="#EBEDF0" />
+    <SolidColorBrush x:Key="CodeBg" Color="#1F2328" />
+    <SolidColorBrush x:Key="CodeText" Color="#E6EDF3" />
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+</ResourceDictionary>

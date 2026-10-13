@@ -1,0 +1,96 @@
+using System.Text.Json;
+using GitSpread.Core.Projects;
+
+namespace GitSpread.Core.Settings;
+
+public sealed class AppSettings
+{
+    /// <summary>Dossiers parcourus pour trouver les projets.</summary>
+    public List<string> RootFolders { get; set; } = [];
+
+    /// <summary>Profondeur maximale de recherche sous chaque dossier racine.</summary>
+    public int ScanDepth { get; set; } = 4;
+
+    public List<string> ExcludedFolders { get; set; } = [.. ScanOptions.DefaultExclusions];
+
+    /// <summary>Thème : System, Light ou Dark.</summary>
+    public string Theme { get; set; } = "System";
+
+    /// <summary>Ordre des onglets choisi par glisser-déposer (clés « hôte/login », et « unlinked »).</summary>
+    public List<string> TabOrder { get; set; } = [];
+
+    /// <summary>Projets ajoutés un par un (n'importe où, avec ou sans git).</summary>
+    public List<string> ExtraProjects { get; set; } = [];
+
+    /// <summary>E-mails de commit confirmés par l'utilisateur pour chaque compte (clé « hôte/login »),
+    /// en plus de ceux que GitHub expose publiquement.</summary>
+    public Dictionary<string, List<string>> AccountEmails { get; set; } = [];
+
+    public static string AccountKey(string host, string login) => $"{host}/{login}".ToLowerInvariant();
+
+    public bool IsKnownEmail(string host, string login, string? email) =>
+        email is not null && AccountEmails.TryGetValue(AccountKey(host, login), out var emails)
+        && emails.Contains(email, StringComparer.OrdinalIgnoreCase);
+
+    public void AddKnownEmail(string host, string login, string email)
+    {
+        var key = AccountKey(host, login);
+        if (!AccountEmails.TryGetValue(key, out var emails)) AccountEmails[key] = emails = [];
+        if (!emails.Contains(email, StringComparer.OrdinalIgnoreCase)) emails.Add(email);
+    }
+
+    public ScanOptions ToScanOptions() =>
+        new(RootFolders) { MaxDepth = ScanDepth, ExcludedFolderNames = ExcludedFolders, ExtraProjects = ExtraProjects };
+}
+
+/// <summary>Préférences en JSON (par défaut %AppData%\GitSpread\settings.json). Aucun secret n'y est stocké.</summary>
+public sealed class SettingsStore(string path)
+{
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+
+    public string Path { get; } = path;
+
+    public static string DefaultPath => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GitSpread", "settings.json");
+
+    public bool Exists => File.Exists(Path);
+
+    /// <summary>Charge les préférences ; un fichier absent ou illisible donne les valeurs par défaut
+    /// (le fichier corrompu est conservé à côté, en .bak).</summary>
+    public AppSettings Load()
+    {
+        if (!File.Exists(Path)) return new AppSettings();
+        try
+        {
+            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(Path), Json) ?? new AppSettings();
+        }
+        catch (JsonException)
+        {
+            File.Copy(Path, Path + ".bak", overwrite: true);
+            return new AppSettings();
+        }
+    }
+
+    public void Save(AppSettings settings)
+    {
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
+        var temp = Path + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(settings, Json));
+        File.Move(temp, Path, overwrite: true); // écriture atomique
+    }
+
+    /// <summary>Dossiers de projets courants qui existent sur cette machine (proposés au premier lancement).</summary>
+    public static List<string> SuggestRootFolders()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string[] candidates =
+        [
+            @"C:\xampp\htdocs", @"C:\wamp64\www", @"C:\laragon\www",
+            System.IO.Path.Combine(home, "source", "repos"),
+            System.IO.Path.Combine(home, "Documents", "GitHub"),
+            System.IO.Path.Combine(home, "Projects"), System.IO.Path.Combine(home, "Projets"),
+            System.IO.Path.Combine(home, "dev"), System.IO.Path.Combine(home, "code"),
+        ];
+        return candidates.Where(Directory.Exists).ToList();
+    }
+}

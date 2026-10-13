@@ -1,0 +1,186 @@
+<Window x:Class="GitSpread.App.RepointWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+        mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:RepointViewModel}"
+        Width="720" Height="800" MinWidth="580" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}" FontFamily="Segoe UI" FontSize="13">
+
+    <Window.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,16,0,6" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource SecondaryButton}" Content="Annuler" Command="{Binding CloseCommand}" Margin="0,0,8,0"
+                        Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Form}" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Lancer" Command="{Binding RunCommand}" IsDefault="True"
+                        Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Form}" />
+                <Button Style="{StaticResource SecondaryButton}" Content="Modifier et réessayer" Command="{Binding BackToFormCommand}" Margin="0,0,8,0"
+                        Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Failed}" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Fermer" Command="{Binding CloseCommand}"
+                        Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Done|Failed}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24,18,24,18">
+                <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Style="{StaticResource Hint}" FontSize="13" Margin="0,4,0,0">
+                    <Run Text="Lien actuel : " /><Run Text="{Binding CurrentLink, Mode=OneWay}" />
+                </TextBlock>
+
+                <StackPanel Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Form}">
+                    <!-- Compte cible -->
+                    <TextBlock Text="Compte GitHub cible" Style="{StaticResource FieldLabel}" />
+                    <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" DisplayMemberPath="Login" />
+
+                    <!-- Mode (seulement vers un autre compte) -->
+                    <StackPanel Visibility="{Binding CanNativeTransfer, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Que veux-tu faire ?" Style="{StaticResource FieldLabel}" />
+                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Mode" IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=Repoint}">
+                            <StackPanel>
+                                <TextBlock Text="Repointer (recommandé)" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Hint}" Text="Ton dossier local garde son code et son historique, et est envoyé dans un repo du compte cible (existant ou nouveau). Le repo d'origine reste en place." />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Mode" IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=NativeTransfer}">
+                            <StackPanel>
+                                <TextBlock Text="Transférer le repo GitHub" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Hint}">
+                                    Le repo existant change de propriétaire (issues, étoiles et historique conservés). Il quitte le compte <Run Text="{Binding SourceAccountLogin, Mode=OneWay}" FontWeight="SemiBold" />. Le compte cible devra accepter la demande reçue par e-mail.
+                                </TextBlock>
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
+
+                    <!-- ===== Repointer ===== -->
+                    <StackPanel Visibility="{Binding Mode, Converter={StaticResource EnumToVisibility}, ConverterParameter=Repoint}">
+                        <TextBlock Text="Repo cible" Style="{StaticResource FieldLabel}" />
+                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Target" IsChecked="{Binding CreateNew}">
+                            <StackPanel>
+                                <TextBlock Text="Créer un nouveau repo" FontWeight="SemiBold" />
+                                <DockPanel Margin="0,8,0,0" IsEnabled="{Binding CreateNew}">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0">
+                                        <RadioButton Content="Privé" GroupName="Visibility" IsChecked="{Binding IsPrivate}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                        <RadioButton Content="Public" GroupName="Visibility" IsChecked="{Binding IsPrivate, Converter={StaticResource Not}}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Nom du nouveau repo" />
+                                </DockPanel>
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Target" IsChecked="{Binding CreateNew, Converter={StaticResource Not}}">
+                            <StackPanel>
+                                <TextBlock Text="Choisir un repo existant" FontWeight="SemiBold" />
+                                <TextBox Text="{Binding RepoFilter, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,6" AutomationProperties.Name="Filtrer les repos" />
+                                <Grid>
+                                    <ListBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding SelectedRepository}" Height="150" BorderBrush="{DynamicResource Border}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Visibility}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" FontSize="12" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <TextBlock Text="Chargement des repos…" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding IsLoadingRepos, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+                            </StackPanel>
+                        </RadioButton>
+
+                        <!-- Analyse du repo cible -->
+                        <TextBlock Text="Vérification du repo cible…" Foreground="{DynamicResource Muted}" Margin="0,4,0,0"
+                                   Visibility="{Binding IsAnalyzingTarget, Converter={StaticResource BoolToVisibility}}" />
+                        <Border CornerRadius="6" Padding="10,8" Margin="0,4,0,0" Visibility="{Binding HasTargetSummary, Converter={StaticResource BoolToVisibility}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TargetDiverges}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource WarningSoft}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Text="{Binding TargetSummary}" TextWrapping="Wrap" />
+                                <StackPanel Visibility="{Binding TargetDiverges, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
+                                    <CheckBox IsChecked="{Binding UseNewBranch}" Content="Envoyer ma branche actuelle sur une nouvelle branche :" />
+                                    <TextBox Text="{Binding NewBranchName, UpdateSourceTrigger=PropertyChanged}" Margin="22,6,0,0" IsEnabled="{Binding UseNewBranch}"
+                                             AutomationProperties.Name="Nom de la nouvelle branche" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Ancien lien" Style="{StaticResource FieldLabel}" Visibility="{Binding HasCurrentLink, Converter={StaticResource BoolToVisibility}}" />
+                        <StackPanel Visibility="{Binding HasCurrentLink, Converter={StaticResource BoolToVisibility}}">
+                            <RadioButton GroupName="OldLink" IsChecked="{Binding KeepOldLink}" Margin="0,2" Content="Le garder sous le nom « old-origin » (recommandé : rien n'est perdu)" />
+                            <RadioButton GroupName="OldLink" IsChecked="{Binding KeepOldLink, Converter={StaticResource Not}}" Margin="0,2" Content="Le supprimer du projet (le repo sur GitHub n'est pas touché)" />
+                        </StackPanel>
+
+                        <TextBlock Text="Quoi envoyer" Style="{StaticResource FieldLabel}" />
+                        <RadioButton GroupName="Scope" IsChecked="{Binding PushAllBranches}" Margin="0,2" Content="Toutes les branches et les tags (recommandé)" />
+                        <RadioButton GroupName="Scope" IsChecked="{Binding PushAllBranches, Converter={StaticResource Not}}" Margin="0,2" Content="Seulement la branche actuelle" />
+
+                        <Border Background="{DynamicResource WarningSoft}" CornerRadius="6" Padding="10,8" Margin="0,12,0,0"
+                                Visibility="{Binding HasUncommittedChanges, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Warning}"
+                                       Text="Tu as des modifications non commitées : elles restent sur ton poste mais ne seront pas envoyées. Commite-les d'abord si tu veux les inclure." />
+                        </Border>
+                    </StackPanel>
+
+                    <TextBlock Text="Ce que GitSpread va exécuter" Style="{StaticResource FieldLabel}" />
+                    <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8">
+                        <ItemsControl ItemsSource="{Binding Preview}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding StringFormat='&gt; {0}'}" Foreground="{DynamicResource CodeText}" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                    <TextBlock Text="Aucun --force : un historique différent sur la cible n'est jamais écrasé. En cas d'échec, le projet retrouve son lien d'origine."
+                               Style="{StaticResource Hint}" Margin="0,6,0,0" />
+
+                    <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                </StackPanel>
+
+                <!-- ===== Exécution ===== -->
+                <StackPanel Margin="0,16,0,0" Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Running|Done|Failed}">
+                    <ProgressBar IsIndeterminate="True" Height="3" BorderThickness="0" Foreground="{DynamicResource Accent}" Background="Transparent" Margin="0,0,0,12"
+                                 Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Running}" />
+                    <Border CornerRadius="8" Padding="14,10" Margin="0,0,0,12" Background="{DynamicResource SuccessSoft}"
+                            Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Done}">
+                        <TextBox Text="{Binding ResultMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                    </Border>
+                    <Border CornerRadius="8" Padding="14,10" Margin="0,0,0,12" Background="{DynamicResource DangerSoft}"
+                            Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Failed}">
+                        <TextBox Text="{Binding ResultMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Progress}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding StringFormat='•  {0}'}" Foreground="{DynamicResource Muted}" Margin="0,2" TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -1,0 +1,100 @@
+<Window x:Class="GitSpread.App.IntegrationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+        mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:IntegrationViewModel}"
+        Width="640" SizeToContent="Height" MaxHeight="760" MinWidth="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="NoResize"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}" FontFamily="Segoe UI" FontSize="13">
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource SecondaryButton}" Content="Annuler" IsCancel="True" Margin="0,0,8,0" />
+                <Button Style="{StaticResource PrimaryButton}" Content="{Binding ActionLabel}" IsDefault="True" Click="Run_Click" IsEnabled="{Binding CanRun}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24,18,24,16">
+                <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+                    <ProgressBar IsIndeterminate="True" Width="80" Height="3" BorderThickness="0" Foreground="{DynamicResource Accent}" Background="Transparent" Margin="0,0,10,0" />
+                    <TextBlock Text="Vérification des nouveautés sur GitHub puis analyse des deux branches…" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
+
+                <StackPanel Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisibility}}">
+                    <!-- Ce qui va se passer -->
+                    <Border Margin="0,14,0,0" CornerRadius="8" Padding="14,10">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Conflicts"><Setter Property="Background" Value="{DynamicResource WarningSoft}" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="NothingToDo"><Setter Property="Background" Value="{DynamicResource SuccessSoft}" /></DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Left" Text="{Binding KindIcon}" Style="{StaticResource Glyph}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Top"
+                                       Foreground="{DynamicResource Accent}" />
+                            <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" />
+                        </DockPanel>
+                    </Border>
+
+                    <Border Margin="0,10,0,0" CornerRadius="8" Padding="14,10" Background="{DynamicResource DangerSoft}"
+                            Visibility="{Binding HasBlocker, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding Blocker}" TextWrapping="Wrap" Foreground="{DynamicResource Danger}" />
+                    </Border>
+
+                    <TextBlock Text="{Binding FetchNote}" Foreground="{DynamicResource Warning}" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0" />
+
+                    <!-- Conflits prévus -->
+                    <StackPanel Margin="0,10,0,0" Visibility="{Binding HasConflicts, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Fichiers modifiés des deux côtés" FontWeight="SemiBold" />
+                        <ItemsControl ItemsSource="{Binding ConflictFiles}" Margin="0,4,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding StringFormat='•  {0}'}" FontFamily="Consolas" Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,6,0,0"
+                                   Text="Sans action de ta part, rien n'est modifié. Si tu lances quand même la fusion, ces fichiers contiendront les deux versions entre des marqueurs &lt;&lt;&lt;&lt;&lt;&lt;&lt; et &gt;&gt;&gt;&gt;&gt;&gt;&gt; : garde la bonne, puis « Terminer la fusion » dans GitSpread. Tu pourras aussi tout « Abandonner »." />
+                    </StackPanel>
+
+                    <!-- Options -->
+                    <StackPanel Margin="0,12,0,0">
+                        <CheckBox IsChecked="{Binding StartDespiteConflicts}" Margin="0,4"
+                                  Visibility="{Binding ShowConflictOption, Converter={StaticResource BoolToVisibility}}"
+                                  Content="Lancer quand même la fusion : je résoudrai les conflits moi-même" />
+                        <CheckBox IsChecked="{Binding StashChanges}" Margin="0,4"
+                                  Visibility="{Binding ShowStashOption, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock TextWrapping="Wrap" Text="Mettre de côté mes modifications non commitées pendant l'opération, puis les restaurer" />
+                        </CheckBox>
+                        <CheckBox IsChecked="{Binding PushTarget}" Margin="0,4"
+                                  Visibility="{Binding ShowPushOption, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock><Run Text="Envoyer « " /><Run Text="{Binding Target, Mode=OneWay}" /><Run Text=" » sur GitHub ensuite" /></TextBlock>
+                        </CheckBox>
+                        <CheckBox IsChecked="{Binding DeleteSource}" Margin="0,4"
+                                  Visibility="{Binding ShowDeleteOption, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock TextWrapping="Wrap"><Run Text="Supprimer la branche locale « " /><Run Text="{Binding Source, Mode=OneWay}" /><Run Text=" » une fois intégrée (sa version GitHub est conservée)" /></TextBlock>
+                        </CheckBox>
+                    </StackPanel>
+
+                    <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
+                        <ItemsControl ItemsSource="{Binding Preview}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding StringFormat='&gt; {0}'}" Foreground="{DynamicResource CodeText}" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

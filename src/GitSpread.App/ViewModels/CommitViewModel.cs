@@ -1,0 +1,163 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using GitSpread.Core.GitHub;
+using GitSpread.Core.Git;
+
+namespace GitSpread.App.ViewModels;
+
+public sealed partial class ChangeItemViewModel(FileChange change) : ObservableObject
+{
+    public FileChange Change { get; } = change;
+    public string Path => Change.OriginalPath is { } from ? $"{Change.Path}   ← {from}" : Change.Path;
+    public ChangeKind Kind => Change.Kind;
+
+    public string KindLabel => Change.Kind switch
+    {
+        ChangeKind.Added => "Ajouté",
+        ChangeKind.Deleted => "Supprimé",
+        ChangeKind.Renamed => "Renommé",
+        ChangeKind.Copied => "Copié",
+        ChangeKind.Untracked => Change.Path.EndsWith('/') ? "Nouveau dossier" : "Nouveau",
+        ChangeKind.Conflicted => "Conflit",
+        ChangeKind.TypeChanged => "Type changé",
+        _ => "Modifié",
+    };
+
+    /// <summary>Dossier de dépendances ou de compilation : décoché par défaut.</summary>
+    public bool IsGenerated => Change.IsLikelyGenerated;
+
+    [ObservableProperty] public partial bool IsSelected { get; set; } = !change.IsLikelyGenerated;
+}
+
+/// <summary>Fenêtre de commit : choix des fichiers, message, vérification de l'identité.</summary>
+public sealed partial class CommitViewModel : ObservableObject
+{
+    private readonly ProjectItemViewModel _project;
+
+    public CommitViewModel(ProjectItemViewModel project, IProjectHost host)
+    {
+        _project = project;
+        _host = host;
+        Identity = new IdentityViewModel(project.Path, host);
+        Changes.CollectionChanged += (_, _) => Refresh();
+        _git = host.Services.Git;
+        GitignoreSuggestion = GitignoreGuesser.Guess(project.Path);
+    }
+
+    private readonly GitService _git;
+    private readonly IProjectHost _host;
+
+    public string? GitignoreSuggestion { get; }
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowGitignoreAdvice), nameof(CanAddGitignore), nameof(AddGitignoreLabel))]
+    public partial bool HasGitignore { get; set; }
+
+    [ObservableProperty] public partial string? GitignoreResult { get; set; }
+
+    public bool HasGeneratedFolders => Changes.Any(c => c.IsGenerated);
+    public bool ShowGitignoreAdvice => !HasGitignore && (HasGeneratedFolders || GitignoreSuggestion is not null);
+    public bool CanAddGitignore => !HasGitignore && GitignoreSuggestion is not null;
+    public string AddGitignoreLabel => $"Ajouter un .gitignore « {GitignoreSuggestion} »";
+
+    public string ProjectName => _project.Name;
+    public ObservableCollection<ChangeItemViewModel> Changes { get; } = [];
+    public IdentityViewModel Identity { get; }
+    public bool CanPushAfter => _project.CanSync;
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanCommit), nameof(CommandsPreview))]
+    public partial string Message { get; set; } = "";
+
+    [ObservableProperty] public partial bool PushAfterCommit { get; set; }
+    [ObservableProperty] public partial string? IdentityResult { get; set; }
+
+    public bool HasChanges => Changes.Count > 0;
+    public bool AllSelected => Changes.All(c => c.IsSelected);
+    public bool CanCommit => Message.Trim().Length > 0 && Changes.Any(c => c.IsSelected);
+    public string SelectionSummary => $"{Changes.Count(c => c.IsSelected)} fichier(s) sur {Changes.Count} sélectionné(s)";
+
+    public IReadOnlyCollection<string> SelectedPathspecs =>
+        Changes.Where(c => c.IsSelected).SelectMany(c => c.Change.Pathspecs).Distinct().ToList();
+
+    public string CommandsPreview
+    {
+        get
+        {
+            var message = Message.Trim().Length == 0 ? "…" : Message.Trim().Split('\n')[0];
+            if (AllSelected) return $"git add --all\ngit commit -m \"{message}\"";
+            var files = string.Join(' ', SelectedPathspecs.Select(p => p.Contains(' ') ? $"\"{p}\"" : p));
+            return $"git add --all -- {files}\ngit commit -m \"{message}\" -- {files}";
+        }
+    }
+
+    public async Task LoadAsync()
+    {
+        await LoadChangesAsync();
+        await Identity.LoadAsync(_project.Placement.Account);
+    }
+
+    private async Task LoadChangesAsync()
+    {
+        HasGitignore = File.Exists(Path.Combine(_project.Path, ".gitignore"));
+        Changes.Clear();
+        foreach (var change in await _git.GetChangesAsync(_project.Path))
+        {
+            var item = new ChangeItemViewModel(change);
+            item.PropertyChanged += OnItemChanged;
+            Changes.Add(item);
+        }
+        OnPropertyChanged(nameof(HasGeneratedFolders));
+        OnPropertyChanged(nameof(ShowGitignoreAdvice));
+    }
+
+    [RelayCommand]
+    private async Task AddGitignoreAsync()
+    {
+        var account = _project.Placement.Account ?? _host.Accounts.FirstOrDefault(a => a.IsAuthenticated);
+        if (GitignoreSuggestion is not { } template) return;
+        if (account is null)
+        {
+            GitignoreResult = "Connecte un compte GitHub pour télécharger le modèle de .gitignore.";
+            return;
+        }
+        try
+        {
+            var content = await _host.Services.GitHub.GetGitignoreTemplateAsync(account, template);
+            await File.WriteAllTextAsync(Path.Combine(_project.Path, ".gitignore"), content);
+            GitignoreResult = $".gitignore « {template} » ajouté : les fichiers qu'il exclut ne seront plus proposés.";
+            await LoadChangesAsync();
+        }
+        catch (Exception e)
+        {
+            GitignoreResult = $"Impossible d'ajouter le .gitignore : {e.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleAll()
+    {
+        var select = !AllSelected;
+        foreach (var c in Changes) c.IsSelected = select;
+    }
+
+    [RelayCommand]
+    private async Task UseSuggestedIdentityAsync()
+    {
+        var results = await Identity.ApplySuggestedAsync();
+        IdentityResult = results.All(r => r.Succeeded)
+            ? "Identité enregistrée pour ce projet uniquement : " + string.Join("  ·  ", results.Select(r => r.Command))
+            : results.First(r => !r.Succeeded).Output;
+    }
+
+    private void OnItemChanged(object? sender, PropertyChangedEventArgs e) => Refresh();
+
+    private void Refresh()
+    {
+        OnPropertyChanged(nameof(HasChanges));
+        OnPropertyChanged(nameof(CanCommit));
+        OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(CommandsPreview));
+    }
+}
