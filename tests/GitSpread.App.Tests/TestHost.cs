@@ -54,6 +54,9 @@ public sealed class TestHost : IProjectHost, IDialogService
     };
 
     public Task<GitHubUser?> GetAccountUserAsync(GitHubAccount account) => Task.FromResult(Users.GetValueOrDefault(account.Login));
+
+    public Task<bool> EnsureScopeAsync(GitHubAccount account, string scope, string reason) => Task.FromResult(account.HasScope(scope));
+    public void ShowScopes(AccountScopesViewModel viewModel) { }
     public Task RescanAsync(string? revealPath = null) => Task.CompletedTask;
     public Task RemoveExtraProjectAsync(string path) => Task.CompletedTask;
 
@@ -78,7 +81,7 @@ public sealed class TestHost : IProjectHost, IDialogService
     public void ShowPublish(PublishViewModel viewModel) { }
     public bool ShowIntegration(IntegrationViewModel viewModel) => false;
     public void ShowRepoint(RepointViewModel viewModel) { }
-    public bool Confirm(string message, string title) => true;
+    public bool Confirm(string message, string title, bool destructive = false) => true;
     public int Choose(string title, string message, IReadOnlyList<string> options) => -1;
     public string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false) => null;
 }

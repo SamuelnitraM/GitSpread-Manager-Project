@@ -111,13 +111,15 @@
         <Style x:Key="AccountTabItem" TargetType="TabItem">
             <Setter Property="AllowDrop" Value="True" />
             <Setter Property="Foreground" Value="{DynamicResource Text}" />
-            <Setter Property="ToolTip" Value="Glisse l'onglet pour le déplacer. Dépose un projet ici pour le passer sur ce compte." />
+            <Setter Property="ToolTip" Value="Glisse l'onglet pour le déplacer. Dépose un projet ici pour le passer sur ce compte. Clic droit : gérer le compte." />
             <EventSetter Event="PreviewMouseLeftButtonDown" Handler="Tab_PreviewMouseDown" />
             <EventSetter Event="PreviewMouseMove" Handler="Tab_PreviewMouseMove" />
             <EventSetter Event="DragEnter" Handler="Tab_DragOver" />
             <EventSetter Event="DragOver" Handler="Tab_DragOver" />
             <EventSetter Event="DragLeave" Handler="Tab_DragLeave" />
             <EventSetter Event="Drop" Handler="Tab_Drop" />
+            <!-- Menu du compte : clic droit, touche Menu ou Maj+F10 -->
+            <EventSetter Event="ContextMenuOpening" Handler="Tab_ContextMenuOpening" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">

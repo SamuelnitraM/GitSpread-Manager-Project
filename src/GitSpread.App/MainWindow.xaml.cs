@@ -67,6 +67,43 @@ public partial class MainWindow : Window
         Shell.Open(ViewModel.LogDirectory);
     }
 
+    // ------------------------------------------------------------ menu d'un compte (F5)
+
+    private void Tab_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not TabItem { DataContext: AccountTabViewModel tab } item) return;
+        var account = tab.Account;
+
+        var menu = new ContextMenu { PlacementTarget = item, Placement = PlacementMode.Bottom };
+        menu.Items.Add(new MenuItem { Header = account.Login, IsEnabled = false, FontWeight = FontWeights.SemiBold });
+        menu.Items.Add(new Separator());
+
+        var makeActive = new MenuItem
+        {
+            Header = account.IsActive ? "Compte actif de gh" : "Rendre actif dans gh",
+            IsEnabled = !account.IsActive && account.IsAuthenticated,
+            ToolTip = "Compte utilisé par gh dans ton terminal. GitSpread, lui, choisit toujours le bon compte pour chaque projet.",
+        };
+        makeActive.Click += async (_, _) => await ViewModel.SwitchToAsync(tab);
+        menu.Items.Add(makeActive);
+
+        var scopes = new MenuItem { Header = "Autorisations du compte…", IsEnabled = account.IsAuthenticated };
+        scopes.Click += async (_, _) => await ViewModel.OpenScopesAsync(account);
+        menu.Items.Add(scopes);
+
+        var profile = new MenuItem { Header = "Voir le profil sur GitHub" };
+        profile.Click += (_, _) => Shell.Open($"https://{account.Host}/{account.Login}");
+        menu.Items.Add(profile);
+
+        menu.Items.Add(new Separator());
+        var logout = new MenuItem { Header = "Déconnecter ce compte…" };
+        logout.Click += async (_, _) => await ViewModel.LogoutAsync(account);
+        menu.Items.Add(logout);
+
+        menu.IsOpen = true;
+    }
+
     // ------------------------------------------------------------ thème
 
     private void Theme_Click(object sender, RoutedEventArgs e)

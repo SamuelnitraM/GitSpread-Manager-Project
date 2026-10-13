@@ -247,6 +247,51 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         DistributeProjects();
     }
 
+    // ------------------------------------------------------------ gestion des comptes (F5)
+
+    /// <summary>Fenêtre des autorisations d'un compte. Vrai si elles ont changé (la liste est alors actualisée).</summary>
+    public async Task<bool> OpenScopesAsync(GitHubAccount account, IReadOnlyCollection<string>? request = null, string? reason = null)
+    {
+        var dialog = new AccountScopesViewModel(account, _services, _accounts, request, reason);
+        Dialogs.ShowScopes(dialog);
+        if (dialog.Completed) await RefreshAsync();
+        return dialog.Completed;
+    }
+
+    public async Task<bool> EnsureScopeAsync(GitHubAccount account, string scope, string reason)
+    {
+        if (account.HasScope(scope)) return true;
+        await OpenScopesAsync(account, [scope], reason);
+        return _accounts.FirstOrDefault(a => a.Login == account.Login && a.Host == account.Host)?.HasScope(scope) == true;
+    }
+
+    /// <summary>Déconnecte un compte de gh (après confirmation). Ses projets passent dans « Non liés / autres ».</summary>
+    public async Task LogoutAsync(GitHubAccount account)
+    {
+        var others = _accounts.Count(a => a.Host == account.Host && a.Login != account.Login);
+        if (!Dialogs.Confirm(
+                $"Déconnecter {account.Login} de GitHub CLI ?\n\n"
+                + "Son token est retiré du trousseau Windows. Ses projets passeront dans « Non liés / autres ».\n"
+                + "Rien n'est supprimé (ni repos, ni fichiers) : tu pourras le reconnecter avec « + »."
+                + (account.IsActive && others > 0 ? "\n\nC'est le compte actif : gh rendra actif un autre compte connecté." : ""),
+                "Déconnecter le compte", destructive: true))
+            return;
+
+        IsLoading = true;
+        try
+        {
+            await _services.Accounts.LogoutAsync(account);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Déconnexion de {Login} impossible", account.Login);
+            GlobalError = $"Impossible de déconnecter {account.Login} : {e.Message}";
+            return;
+        }
+        finally { IsLoading = false; }
+        await RefreshAsync();
+    }
+
     // ------------------------------------------------------------ ordre des onglets
 
     /// <summary>Déplace un onglet avant ou après un autre, et mémorise le nouvel ordre.</summary>

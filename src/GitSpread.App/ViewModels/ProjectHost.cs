@@ -18,6 +18,10 @@ public interface IProjectHost
     /// Null si GitHub est injoignable.</summary>
     Task<GitHubUser?> GetAccountUserAsync(GitHubAccount account);
 
+    /// <summary>Vérifie qu'un compte a une autorisation ; sinon propose de l'ajouter (validation dans le navigateur).
+    /// Vrai si l'autorisation est disponible à la fin.</summary>
+    Task<bool> EnsureScopeAsync(GitHubAccount account, string scope, string reason);
+
     /// <summary>Relance l'analyse (le projet a pu changer d'onglet) puis le resélectionne.</summary>
     Task RescanAsync(string? revealPath = null);
 
@@ -31,7 +35,9 @@ public interface IDialogService
     void ShowPublish(PublishViewModel viewModel);
     bool ShowIntegration(IntegrationViewModel viewModel);
     void ShowRepoint(RepointViewModel viewModel);
-    bool Confirm(string message, string title);
+    void ShowScopes(AccountScopesViewModel viewModel);
+    /// <param name="destructive">Action difficile à défaire : « Non » est le choix par défaut (Entrée).</param>
+    bool Confirm(string message, string title, bool destructive = false);
 
     /// <summary>Choix parmi plusieurs réponses : index choisi, ou -1 si annulé.</summary>
     int Choose(string title, string message, IReadOnlyList<string> options);

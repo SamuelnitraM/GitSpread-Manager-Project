@@ -38,7 +38,7 @@ internal static class SmallDialogs
     }
 
     /// <summary>Question fermée, aux couleurs de l'application (la MessageBox de Windows ignore le thème).</summary>
-    public static bool Confirm(Window? owner, string title, string message)
+    public static bool Confirm(Window? owner, string title, string message, bool destructive = false)
     {
         var result = false;
         var window = Create(owner, title);
@@ -51,15 +51,16 @@ internal static class SmallDialogs
         text.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
         panel.Children.Add(text);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
-        var no = new Button { Style = (Style)Application.Current.Resources["SecondaryButton"], Content = "Non", IsCancel = true, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
-        var yes = new Button { Style = (Style)Application.Current.Resources["PrimaryButton"], Content = "Oui", IsDefault = true, MinWidth = 80 };
+        var no = new Button { Style = (Style)Application.Current.Resources["SecondaryButton"], Content = "Non", IsCancel = true, IsDefault = destructive, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+        var yes = new Button { Style = (Style)Application.Current.Resources[destructive ? "SecondaryButton" : "PrimaryButton"], Content = "Oui", IsDefault = !destructive, MinWidth = 80 };
+        if (destructive) yes.SetResourceReference(Control.ForegroundProperty, "Danger");
         no.Click += (_, _) => window.Close();
         yes.Click += (_, _) => { result = true; window.Close(); };
         buttons.Children.Add(no);
         buttons.Children.Add(yes);
         panel.Children.Add(buttons);
         window.Content = panel;
-        window.Loaded += (_, _) => yes.Focus();
+        window.Loaded += (_, _) => (destructive ? no : yes).Focus();
         window.ShowDialog();
         return result;
     }

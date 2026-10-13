@@ -206,7 +206,7 @@ public sealed partial class ProjectItemViewModel
     private async Task AbortOperationAsync()
     {
         if (!host.Dialogs.Confirm("Abandonner l'opération en cours ?\n\nLe projet revient exactement à son état d'avant la fusion. Les fichiers déjà modifiés pour résoudre les conflits seront remis comme avant.",
-                "Abandonner"))
+                "Abandonner", destructive: true))
             return;
         var operation = Operation;
         await RunAsync("Abandonner", async () =>

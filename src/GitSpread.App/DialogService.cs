@@ -20,7 +20,10 @@ public sealed class DialogService : IDialogService
     public void ShowRepoint(RepointViewModel viewModel) =>
         new RepointWindow(viewModel) { Owner = Owner }.ShowDialog();
 
-    public bool Confirm(string message, string title) => SmallDialogs.Confirm(Owner, title, message);
+    public void ShowScopes(AccountScopesViewModel viewModel) =>
+        new ScopesWindow(viewModel) { Owner = Owner }.ShowDialog();
+
+    public bool Confirm(string message, string title, bool destructive = false) => SmallDialogs.Confirm(Owner, title, message, destructive);
 
     public int Choose(string title, string message, IReadOnlyList<string> options) =>
         SmallDialogs.Choose(Owner, title, message, options);

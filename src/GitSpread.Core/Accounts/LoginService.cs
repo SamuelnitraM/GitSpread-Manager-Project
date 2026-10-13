@@ -84,7 +84,7 @@ public sealed partial class LoginService(GhCli gh, AccountService accounts)
     public Task SetupGitAsync(string host, CancellationToken cancellationToken = default) =>
         gh.RunCheckedAsync(["auth", "setup-git", "--hostname", host], cancellationToken: cancellationToken);
 
-    internal static DeviceCode? ParseDeviceCode(string output)
+    public static DeviceCode? ParseDeviceCode(string output)
     {
         var code = Code().Match(output);
         if (!code.Success) return null;
