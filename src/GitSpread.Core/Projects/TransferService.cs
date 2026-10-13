@@ -48,6 +48,10 @@ public sealed record RepointPlan(string Directory, GitHubAccount TargetAccount, 
     public string? PushToNewBranch { get; init; }
 
     public string RemoteName { get; init; } = "origin";
+
+    /// <summary>F3B : ajouter ce repo comme lien secondaire (remote <see cref="RemoteName"/>) sans toucher au lien actuel.</summary>
+    public bool KeepCurrentLink { get; init; }
+
     public string FullName => $"{TargetAccount.Login}/{TargetRepository}";
 }
 
@@ -88,17 +92,18 @@ public sealed class TransferService(GitService git, GitHubService gitHub, GitCre
         var url = plan.TargetUrl ?? $"https://{plan.TargetAccount.Host}/{plan.FullName}.git";
         if (plan.CreateRepository)
             steps.Add($"gh repo create {plan.FullName} --{(plan.Visibility == RepositoryVisibility.Public ? "public" : "private")}   (avec le compte {plan.TargetAccount.Login})");
-        if (currentRemoteUrl is not null)
+        if (currentRemoteUrl is not null && !plan.KeepCurrentLink)
             steps.Add(plan.OldRemote == OldRemoteAction.KeepAsOldOrigin
                 ? $"git remote rename {plan.RemoteName} {OldRemoteName}"
                 : $"git remote remove {plan.RemoteName}");
         steps.Add($"git remote add {plan.RemoteName} {url}");
+        var upstream = plan.KeepCurrentLink ? "" : "--set-upstream "; // un lien secondaire ne devient pas la référence des branches
         if (plan.PushToNewBranch is { } newBranch)
-            steps.Add($"git push --set-upstream {plan.RemoteName} {currentBranch}:{newBranch}");
+            steps.Add($"git push {upstream}{plan.RemoteName} {currentBranch}:{newBranch}");
         else if (plan.Scope == PushScope.AllBranchesAndTags)
-            steps.AddRange([$"git push --set-upstream {plan.RemoteName} --all", $"git push {plan.RemoteName} --tags"]);
+            steps.AddRange([$"git push {upstream}{plan.RemoteName} --all", $"git push {plan.RemoteName} --tags"]);
         else
-            steps.Add($"git push --set-upstream {plan.RemoteName} {currentBranch}");
+            steps.Add($"git push {upstream}{plan.RemoteName} {currentBranch}");
         steps.Add($"(envois faits avec le compte {plan.TargetAccount.Login})");
         return steps;
     }
@@ -133,7 +138,9 @@ public sealed class TransferService(GitService git, GitHubService gitHub, GitCre
 
         // 2. Ancien lien
         var remotes = await git.GetRemotesAsync(dir, ct);
-        var old = remotes.FirstOrDefault(r => r.Name == plan.RemoteName);
+        if (plan.KeepCurrentLink && remotes.Any(r => r.Name == plan.RemoteName))
+            throw new InvalidOperationException($"Le projet a déjà un lien nommé « {plan.RemoteName} » : choisis un autre nom.");
+        var old = plan.KeepCurrentLink ? null : remotes.FirstOrDefault(r => r.Name == plan.RemoteName);
         var keptAs = OldRemoteName;
         for (var i = 2; remotes.Any(r => r.Name == keptAs); i++) keptAs = $"{OldRemoteName}-{i}";
         if (old is not null)
@@ -153,11 +160,12 @@ public sealed class TransferService(GitService git, GitHubService gitHub, GitCre
 
             progress?.Report($"Envoi avec le compte {plan.TargetAccount.Login}…");
             var auth = await credentials.EnvironmentForAsync(plan.TargetAccount, RemoteUrlParser.Parse(url), ct);
+            var upstream = !plan.KeepCurrentLink;
             IReadOnlyList<GitResult> push = plan.PushToNewBranch is { } newBranch
-                ? [await git.PushToAsync(dir, plan.RemoteName, branch, newBranch, auth, ct)]
+                ? [await git.PushToAsync(dir, plan.RemoteName, branch, newBranch, auth, ct, upstream)]
                 : plan.Scope == PushScope.AllBranchesAndTags
-                    ? await git.PushAllAsync(dir, plan.RemoteName, auth, ct)
-                    : [await git.PushAsync(dir, plan.RemoteName, branch, setUpstream: true, auth, ct)];
+                    ? await git.PushAllAsync(dir, plan.RemoteName, auth, ct, upstream)
+                    : [await git.PushAsync(dir, plan.RemoteName, branch, setUpstream: upstream, auth, ct)];
             steps.AddRange(push);
             foreach (var p in push) p.EnsureSuccess();
         }
@@ -172,8 +180,13 @@ public sealed class TransferService(GitService git, GitHubService gitHub, GitCre
                 else await git.AddRemoteAsync(dir, plan.RemoteName, old.Url, ct);
             }
             var created = plan.CreateRepository ? $" Le repo {plan.FullName} a été créé sur GitHub et reste vide : tu peux le réutiliser ou le supprimer depuis GitHub." : "";
-            throw new InvalidOperationException($"{e.Message} Le projet a retrouvé son lien d'origine.{created}", e);
+            throw new InvalidOperationException($"{e.Message} Le projet a retrouvé {(plan.KeepCurrentLink ? "ses liens d'origine" : "son lien d'origine")}.{created}", e);
         }
+
+        if (plan.KeepCurrentLink)
+            return new TransferResult(url, steps, plan.PushToNewBranch is { } b
+                ? $"Le projet est maintenant aussi lié à {plan.FullName} (lien « {plan.RemoteName} »). Ta branche {branch} y a été envoyée sur la nouvelle branche {b}. Le lien principal ne change pas."
+                : $"Le projet est maintenant aussi lié à {plan.FullName} (lien « {plan.RemoteName} »). Le lien principal ne change pas.");
 
         var message = plan.PushToNewBranch is { } nb
             ? $"Le projet est maintenant lié à {plan.FullName}. Ta branche {branch} a été envoyée sur la nouvelle branche {nb}."

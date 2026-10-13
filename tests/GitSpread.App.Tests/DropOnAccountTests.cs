@@ -39,7 +39,7 @@ public class DropOnAccountTests
     [Fact]
     public async Task A_linked_project_opens_repointing_on_the_target_account()
     {
-        var host = new TestHost { ChooseAnswer = 1 }; // F3A : « Relier le projet à un repo de SamuelnitraM » (0 = le partager)
+        var host = new TestHost { ChooseAnswer = 2 }; // « Relier … à la place du lien actuel » (0 = partager, 1 = ajouter un repo)
         var project = host.Project(account: TestHost.Pro, remote: "https://github.com/SmartDev-Web/stock.git");
 
         await project.ChangeLinkedRepositoryAsync(TestHost.Perso);

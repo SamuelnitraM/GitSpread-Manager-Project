@@ -99,6 +99,15 @@
                 <TextBlock Text="Décris en une phrase ce que tu as changé (ex. « Corrige le calcul du stock »)." Foreground="{DynamicResource Muted}" Margin="0,2,0,6" />
                 <TextBox x:Name="MessageInput" Text="{Binding Message, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
                          Height="64" Padding="6" VerticalScrollBarVisibility="Auto" BorderBrush="{DynamicResource Border}" />
+                <!-- F3B : créditer les autres comptes liés au projet -->
+                <ItemsControl ItemsSource="{Binding CoAuthors}" Margin="0,6,0,0" Visibility="{Binding HasCoAuthors, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:CoAuthorChoice}">
+                            <CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Label}" Margin="0,2" AutomationProperties.Name="{Binding Label}"
+                                      ToolTip="Ajoute une ligne « Co-authored-by » au message : GitHub affiche alors ce compte comme contributeur du commit" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
 
             <!-- Qui signe le commit -->

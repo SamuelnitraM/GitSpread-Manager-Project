@@ -24,6 +24,7 @@ public sealed record AppServices(
     BranchIntegrator Integrator,
     TransferService Transfer,
     LinkedProjects Linked,
+    ProjectLinks Links,
     SshKeyService SshKeys,
     ProjectScanner Scanner,
     SettingsStore SettingsStore,
@@ -361,7 +362,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         ProjectItemViewModel Item(ProjectPlacement p, GitHubAccount? viewer) =>
             new(p, this) { ViewingAccount = viewer, LastAction = previousLogs.GetValueOrDefault(p.Project.Path) };
 
-        // Un projet partagé apparaît chez son propriétaire et chez chaque collaborateur connecté (F3A).
+        // Un projet partagé apparaît chez son propriétaire, chez chaque collaborateur connecté (F3A) et chez le compte de chaque lien secondaire (F3B).
         var collaborations = new CollaborationIndex();
         foreach (var tab in AccountTabs)
             foreach (var repo in tab.Collaborations) collaborations.Add(tab.Account, repo.FullName);
@@ -369,7 +370,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         var placements = ProjectClassifier.Classify(_projects, _accounts, collaborations, Settings.ProjectAccount);
         foreach (var tab in AccountTabs)
             tab.SetProjects(placements
-                .Where(p => tab.Account.Is(p.Account) || p.IsCollaborator(tab.Account))
+                .Where(p => p.BelongsTo(tab.Account))
                 .Select(p => Item(p, tab.Account)));
         _unlinked.SetProjects(placements.Where(p => p.Reason is not null).Select(p => Item(p, null)));
     }

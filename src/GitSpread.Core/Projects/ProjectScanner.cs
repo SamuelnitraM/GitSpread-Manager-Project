@@ -20,12 +20,24 @@ public sealed record LocalProject(string Path)
     /// </summary>
     public string? PushAccount { get; init; }
 
+    /// <summary>Tous les remotes, dans l'ordre du .git/config (F3B : un projet lié à plusieurs repos).</summary>
+    public IReadOnlyList<ProjectRemote> Remotes { get; init; } = [];
+
+    /// <summary>Liens cochés au dernier « Pousser » (gitspread.pushRemotes). Vide : le lien principal seul.</summary>
+    public IReadOnlyList<string> PushRemotes { get; init; } = [];
+
+    /// <summary>Remotes connus : <see cref="Remotes"/>, ou à défaut le seul remote principal.</summary>
+    public IReadOnlyList<ProjectRemote> AllRemotes =>
+        Remotes.Count > 0 ? Remotes : Remote is null ? [] : [new ProjectRemote(RemoteName ?? "origin", Remote)];
+
     /// <summary>Faux pour un projet ajouté à la main qui n'est pas encore suivi par git.</summary>
     public bool IsRepository { get; init; } = true;
 
     /// <summary>Vrai si le projet a été ajouté un par un (et peut donc être retiré de la liste).</summary>
     public bool IsExtra { get; init; }
 }
+
+public sealed record ProjectRemote(string Name, RemoteUrl Url);
 
 public sealed record ScanOptions(IReadOnlyList<string> Roots)
 {
@@ -104,14 +116,17 @@ public sealed class ProjectScanner
         var configPath = FindConfig(directory);
         if (configPath is null) return null;
 
-        var (remotes, pushAccount) = ReadConfig(configPath);
-        var (name, url) = remotes.FirstOrDefault(r => r.Name == "origin") is { Name: not null } origin ? origin : remotes.FirstOrDefault();
+        var config = ReadConfig(configPath);
+        var remotes = config.Remotes.Select(r => new ProjectRemote(r.Name, RemoteUrlParser.Parse(r.Url, ssh))).ToList();
+        var primary = remotes.FirstOrDefault(r => r.Name == "origin") ?? remotes.FirstOrDefault();
         return new LocalProject(directory)
         {
-            RemoteName = name,
-            Remote = url is null ? null : RemoteUrlParser.Parse(url, ssh),
+            RemoteName = primary?.Name,
+            Remote = primary?.Url,
             RemoteCount = remotes.Count,
-            PushAccount = pushAccount,
+            Remotes = remotes,
+            PushAccount = config.PushAccount,
+            PushRemotes = config.PushRemotes,
         };
     }
 
@@ -141,16 +156,19 @@ public sealed class ProjectScanner
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
     }
 
+    internal sealed record ConfigSummary(List<(string Name, string Url)> Remotes, string? PushAccount, IReadOnlyList<string> PushRemotes);
+
     /// <summary>Remotes (nom, URL) et réglages GitSpread du .git/config.</summary>
-    internal static (List<(string Name, string Url)> Remotes, string? PushAccount) ReadConfig(string configPath)
+    internal static ConfigSummary ReadConfig(string configPath)
     {
         var remotes = new List<(string, string)>();
         string? pushAccount = null;
+        IReadOnlyList<string> pushRemotes = [];
         string? remote = null;
         var inGitSpread = false;
         IEnumerable<string> lines;
         try { lines = File.ReadAllLines(configPath); }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return (remotes, null); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return new(remotes, null, []); }
 
         foreach (var raw in lines)
         {
@@ -168,9 +186,11 @@ public sealed class ProjectScanner
                     remotes.Add((remote, UnescapeConfigValue(value.Trim())));
                 else if (inGitSpread && key.Equals("pushAccount", StringComparison.OrdinalIgnoreCase))
                     pushAccount = UnescapeConfigValue(value.Trim()) is { Length: > 0 } login ? login : null;
+                else if (inGitSpread && key.Equals("pushRemotes", StringComparison.OrdinalIgnoreCase))
+                    pushRemotes = UnescapeConfigValue(value.Trim()).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             }
         }
-        return (remotes, pushAccount);
+        return new(remotes, pushAccount, pushRemotes);
     }
 
     /// <summary>Valeur de .git/config : guillemets retirés et échappements résolus (\\ → \, \" → ", \t, \n).</summary>

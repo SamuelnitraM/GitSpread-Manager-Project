@@ -76,6 +76,13 @@
                                             <TextBlock Text="{Binding SharingBadge}" FontSize="11" Foreground="{DynamicResource Accent}" />
                                         </StackPanel>
                                     </Border>
+                                    <Border Style="{StaticResource Pill}" Background="{DynamicResource AccentSoft}" ToolTip="{Binding LinksLabel}"
+                                            Visibility="{Binding HasSecondaryLinks, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE71B;" Style="{StaticResource Glyph}" FontSize="10" Foreground="{DynamicResource Accent}" Margin="0,0,4,0" />
+                                            <TextBlock Text="{Binding LinksBadge}" FontSize="11" Foreground="{DynamicResource Accent}" />
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                                 <TextBlock Margin="22,2,0,0" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis">
                                     <Run Text="{Binding RemoteLabel, Mode=OneWay}" />
@@ -142,6 +149,70 @@
                         </StackPanel>
                         <TextBox Text="{Binding RemoteDetail, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Muted}" FontSize="12"
                                  Visibility="{Binding HasRemote, Converter={StaticResource BoolToVisibility}}" />
+
+                        <!-- Liens vers plusieurs repos (F3B) -->
+                        <StackPanel Visibility="{Binding HasRemote, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel Visibility="{Binding HasSecondaryLinks, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="LIENS · ENVOYER VERS" Style="{StaticResource SectionLabel}" />
+                                <ItemsControl ItemsSource="{Binding LinkRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:LinkRowViewModel}">
+                                            <Border BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,6">
+                                                <DockPanel>
+                                                    <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,2,8,0"
+                                                              AutomationProperties.Name="{Binding Name, StringFormat=Envoyer vers {0}}"
+                                                              ToolTip="Coché : « Pousser » envoie aussi vers ce repo (choix mémorisé pour ce projet)"
+                                                              IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource Not}}" />
+                                                    <StackPanel>
+                                                        <WrapPanel>
+                                                            <TextBlock Text="{Binding RepositoryLabel}" FontWeight="SemiBold" Margin="0,0,6,0" />
+                                                            <Border Style="{StaticResource Pill}" Margin="0" BorderThickness="1" BorderBrush="{DynamicResource Border}">
+                                                                <TextBlock FontSize="11" Foreground="{DynamicResource Muted}"><Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding RoleLabel, Mode=OneWay}" /></TextBlock>
+                                                            </Border>
+                                                        </WrapPanel>
+                                                        <TextBlock Text="{Binding AccountLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding StateLabel}" FontSize="12" TextWrapping="Wrap">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasExtraCommits}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+                                                                            <Setter Property="ToolTip" Value="Quelqu'un a envoyé directement sur ce repo : un envoi y sera refusé (rien n'est écrasé). Pour récupérer ces commits, fais-en le lien principal puis « Tirer »." />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <WrapPanel Margin="-6,2,0,0" Visibility="{Binding IsSecondary, Converter={StaticResource BoolToVisibility}}"
+                                                                   IsEnabled="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource Not}}">
+                                                            <Button Style="{StaticResource GhostButton}" Content="Définir comme principal" FontSize="12"
+                                                                    Command="{Binding DataContext.MakePrimaryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding Name, StringFormat=Définir {0} comme principal}" />
+                                                            <Button Style="{StaticResource GhostButton}" Content="Renommer…" FontSize="12"
+                                                                    Command="{Binding DataContext.RenameLinkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding Name, StringFormat=Renommer le lien {0}}" />
+                                                            <Button Style="{StaticResource GhostButton}" Content="Retirer…" FontSize="12"
+                                                                    Command="{Binding DataContext.RemoveLinkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding Name, StringFormat=Retirer le lien {0}}" />
+                                                        </WrapPanel>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding PushTargetsLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Style="{StaticResource GhostButton}" Command="{Binding AddLinkCommand}" HorizontalAlignment="Left" Margin="-6,4,0,0"
+                                    AutomationProperties.Name="Ajouter un lien" IsEnabled="{Binding IsBusy, Converter={StaticResource Not}}"
+                                    ToolTip="Relier aussi ce projet à un autre repo (sur ce compte ou un autre) : le lien actuel reste le principal">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE71B;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock Text="Ajouter un lien vers un autre repo…" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
 
                         <!-- Repo partagé entre plusieurs comptes connectés (F3A) -->
                         <Border Margin="0,10,0,0" Background="{DynamicResource AccentSoft}" CornerRadius="6" Padding="10,6"

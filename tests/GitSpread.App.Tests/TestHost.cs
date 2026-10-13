@@ -34,7 +34,7 @@ public sealed class TestHost : IProjectHost, IDialogService
         var dir = Directory.CreateTempSubdirectory("GitSpread app tests ").FullName;
         Services = new AppServices(accountService, gitHub, new LoginService(gh, accountService), git, credentials,
             new ProjectPublisher(git, gitHub, credentials), new BranchIntegrator(git), new TransferService(git, gitHub, credentials),
-            new LinkedProjects(git, credentials),
+            new LinkedProjects(git, credentials), new ProjectLinks(git, credentials),
             new SshKeyService(runner, Path.Combine(dir, ".ssh")), new ProjectScanner(),
             new SettingsStore(Path.Combine(dir, "settings.json")), NullLoggerFactory.Instance, dir);
         Accounts = accounts.Length > 0 ? accounts : [Pro, Perso];
@@ -96,7 +96,10 @@ public sealed class TestHost : IProjectHost, IDialogService
     public void ShowPublish(PublishViewModel viewModel) => Shown.Add(viewModel);
     public bool ShowIntegration(IntegrationViewModel viewModel) => false;
     public void ShowRepoint(RepointViewModel viewModel) => Shown.Add(viewModel);
-    public bool Confirm(string message, string title, bool destructive = false) => true;
+    /// <summary>Questions posées (Oui/Non), dans l'ordre. La réponse est toujours oui, sauf si <see cref="ConfirmAnswer"/> dit non.</summary>
+    public List<string> Confirms { get; } = [];
+    public bool ConfirmAnswer { get; set; } = true;
+    public bool Confirm(string message, string title, bool destructive = false) { Confirms.Add(message); return ConfirmAnswer; }
     /// <summary>Réponses données aux saisies successives (null = annuler). La validation de la fenêtre est appliquée.</summary>
     public Queue<string?> PromptAnswers { get; } = new();
     public List<string> PromptErrors { get; } = [];

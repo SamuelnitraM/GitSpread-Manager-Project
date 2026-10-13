@@ -202,7 +202,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             await GitHub.RenameBranchAsync(Account, FullName, current, target);
             var results = new List<GitResult>();
             foreach (var project in LinkedProjects)
-                results.AddRange(await host.Services.Linked.FollowBranchRenameAsync(project, Account, current, target));
+                results.AddRange(await host.Services.Linked.FollowBranchRenameAsync(project, Account, current, target, FullName));
             return Log("Renommer la branche principale", $"gh api --method POST repos/{FullName}/branches/{current}/rename -f new_name={target}", results,
                 $"La branche principale s'appelle maintenant « {target} »." + LinkedSummary(results));
         });
@@ -260,7 +260,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             if (LinkedProjects.Count > 0 && host.Dialogs.Confirm(
                     $"{FullName} est supprimé.\n\nRetirer aussi le lien vers ce repo des {LinkedProjects.Count} projet(s) local(aux) ? Leurs fichiers et leur historique ne changent pas.",
                     "Liens locaux"))
-                foreach (var p in LinkedProjects) results.Add(await host.Services.Linked.UnlinkAsync(p));
+                foreach (var p in LinkedProjects) results.Add(await host.Services.Linked.UnlinkAsync(p, FullName));
             return Log("Supprimer le repo", $"gh repo delete {FullName} --yes", results, $"{FullName} a été supprimé de GitHub." + LinkedSummary(results));
         });
         if (LastAction is { Succeeded: true }) tab.CloseRepositoryPanel();
@@ -273,7 +273,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
     private async Task<List<GitResult>> FollowLinkedAsync(string newOwner, string newName)
     {
         var results = new List<GitResult>();
-        foreach (var project in LinkedProjects) results.Add(await host.Services.Linked.FollowAsync(project, newOwner, newName));
+        foreach (var project in LinkedProjects) results.Add(await host.Services.Linked.FollowAsync(project, newOwner, newName, FullName));
         return results;
     }
 

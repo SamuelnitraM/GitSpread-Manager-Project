@@ -32,6 +32,15 @@ public sealed partial class ChangeItemViewModel(FileChange change) : ObservableO
     [ObservableProperty] public partial bool IsSelected { get; set; } = !change.IsLikelyGenerated;
 }
 
+/// <summary>Compte lié au projet, ajouté au commit comme co-auteur (GitHub l'affiche alors comme contributeur).</summary>
+public sealed partial class CoAuthorChoice(string login, string trailer) : ObservableObject
+{
+    public string Login { get; } = login;
+    public string Trailer { get; } = trailer;
+    public string Label => $"Ajouter {Login} comme co-auteur";
+    [ObservableProperty] public partial bool IsChecked { get; set; }
+}
+
 /// <summary>Fenêtre de commit : choix des fichiers, message, vérification de l'identité.</summary>
 public sealed partial class CommitViewModel : ObservableObject
 {
@@ -85,7 +94,8 @@ public sealed partial class CommitViewModel : ObservableObject
     {
         get
         {
-            var message = Message.Trim().Length == 0 ? "…" : Message.Trim().Split('\n')[0];
+            var message = (Message.Trim().Length == 0 ? "…" : Message.Trim().Split('\n')[0])
+                          + (CoAuthors.Any(c => c.IsChecked) ? " (+ Co-authored-by)" : "");
             if (AllSelected) return $"git add --all\ngit commit -m \"{message}\"";
             var files = string.Join(' ', SelectedPathspecs.Select(p => p.Contains(' ') ? $"\"{p}\"" : p));
             return $"git add --all -- {files}\ngit commit -m \"{message}\" -- {files}";
@@ -96,6 +106,37 @@ public sealed partial class CommitViewModel : ObservableObject
     {
         await LoadChangesAsync();
         await Identity.LoadAsync(_project.Placement.NetworkAccount);
+        await LoadCoAuthorsAsync();
+    }
+
+    // ------------------------------------------------------------ co-auteurs (F3B)
+
+    /// <summary>Autres comptes liés au projet, qu'on peut créditer comme co-auteurs (décochés par défaut).</summary>
+    public ObservableCollection<CoAuthorChoice> CoAuthors { get; } = [];
+    public bool HasCoAuthors => CoAuthors.Count > 0;
+
+    /// <summary>Message envoyé à git : celui saisi, suivi des lignes « Co-authored-by » cochées.</summary>
+    public string FinalMessage => CoAuthors.Where(c => c.IsChecked).Select(c => c.Trailer).ToList() is { Count: > 0 } trailers
+        ? Message.Trim() + "\n\n" + string.Join("\n", trailers)
+        : Message.Trim();
+
+    private async Task LoadCoAuthorsAsync()
+    {
+        var placement = _project.Placement;
+        var related = placement.AccessAccounts.Concat(placement.SecondaryLinks.Select(l => l.Account).OfType<Core.Accounts.GitHubAccount>())
+            .DistinctBy(a => (a.Host, a.Login.ToLowerInvariant())).ToList();
+        if (related.Count < 2) return; // un seul compte : personne d'autre à créditer
+
+        var email = (await _git.GetIdentityAsync(_project.Path)).Email;
+        foreach (var account in related)
+        {
+            if (await _host.GetAccountUserAsync(account) is not { } user) continue;
+            if (email is not null && (user.OwnsEmail(email) || _host.Settings.IsKnownEmail(account.Host, account.Login, email))) continue; // c'est l'auteur
+            var choice = new CoAuthorChoice(account.Login, $"Co-authored-by: {user.Name ?? user.Login} <{user.NoReplyEmail}>");
+            choice.PropertyChanged += (_, _) => OnPropertyChanged(nameof(CommandsPreview));
+            CoAuthors.Add(choice);
+        }
+        OnPropertyChanged(nameof(HasCoAuthors));
     }
 
     private async Task LoadChangesAsync()

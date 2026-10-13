@@ -50,9 +50,10 @@ public sealed class CollaborationTests : IDisposable
     }
 
     [Fact]
-    public async Task Dropping_on_an_account_that_already_collaborates_goes_straight_to_repointing()
+    public async Task Dropping_on_an_account_that_already_collaborates_no_longer_offers_to_share()
     {
         var host = Host();
+        host.ChooseAnswer = 1; // F3B : 0 = ajouter un repo de SamuelnitraM, 1 = remplacer le lien (plus de « Donner accès »)
         var placement = new ProjectPlacement(new LocalProject(_local.Path) { Remote = Core.Git.RemoteUrlParser.Parse("https://github.com/SmartDev-Web/stock.git"), RemoteName = "origin" },
             TestHost.Pro, null) { Collaborators = [TestHost.Perso] };
 

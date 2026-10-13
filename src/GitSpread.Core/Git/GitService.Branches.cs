@@ -184,18 +184,19 @@ public sealed partial class GitService
             .ToList();
     }
 
-    /// <summary>Pousse toutes les branches locales (en les liant au distant) puis les tags. Jamais de --force.</summary>
+    /// <summary>Pousse toutes les branches locales (en les liant au distant, sauf pour un lien secondaire) puis les tags. Jamais de --force.</summary>
     public async Task<IReadOnlyList<GitResult>> PushAllAsync(string repositoryPath, string remote,
-        IReadOnlyDictionary<string, string> auth, CancellationToken ct = default)
+        IReadOnlyDictionary<string, string> auth, CancellationToken ct = default, bool setUpstream = true)
     {
-        var branches = await ActAsync(repositoryPath, ["push", "--set-upstream", remote, "--all"], auth, ct, NetworkTimeout);
+        var branches = await ActAsync(repositoryPath, setUpstream ? ["push", "--set-upstream", remote, "--all"] : ["push", remote, "--all"], auth, ct, NetworkTimeout);
         return branches.Succeeded ? [branches, await ActAsync(repositoryPath, ["push", remote, "--tags"], auth, ct, NetworkTimeout)] : [branches];
     }
 
     /// <summary>Pousse une branche locale vers une branche distante éventuellement différente.</summary>
     public Task<GitResult> PushToAsync(string repositoryPath, string remote, string localBranch, string remoteBranch,
-        IReadOnlyDictionary<string, string> auth, CancellationToken ct = default) =>
-        ActAsync(repositoryPath, ["push", "--set-upstream", remote, $"{localBranch}:{remoteBranch}"], auth, ct, NetworkTimeout);
+        IReadOnlyDictionary<string, string> auth, CancellationToken ct = default, bool setUpstream = true) =>
+        ActAsync(repositoryPath, setUpstream ? ["push", "--set-upstream", remote, $"{localBranch}:{remoteBranch}"] : ["push", remote, $"{localBranch}:{remoteBranch}"],
+            auth, ct, NetworkTimeout);
 
     // ------------------------------------------------------------ analyse
 

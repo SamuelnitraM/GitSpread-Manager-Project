@@ -235,6 +235,20 @@ public sealed partial class ProjectItemViewModel
                 string.Join("\n", result.Steps.Select(s => s.Command)),
                 string.Join("\n", result.Steps.Select(s => s.Output).Where(o => o.Length > 0)));
         });
+
+        // F3B : la branche intégrée part aussi vers les autres liens cochés, après confirmation.
+        var others = SelectedLinks.Where(l => l.IsSecondary).ToList();
+        if (options.PushTarget && others.Count > 0 && LastAction is { Succeeded: true } integrated)
+            await RunAsync(dialog.Title, async () =>
+            {
+                var pushed = await PushToLinksAsync(analysis.Target, others, setPrimaryUpstream: false, alwaysConfirm: true);
+                return pushed with
+                {
+                    Message = integrated.Message + "\n" + pushed.Message,
+                    Commands = integrated.Commands + "\n" + pushed.Commands,
+                    Output = string.Join("\n", new[] { integrated.Output, pushed.Output }.Where(o => o.Length > 0)),
+                };
+            });
     }
 
     // ------------------------------------------------------------ étapes 4 et 5 : changer le repo lié / de compte
@@ -257,27 +271,40 @@ public sealed partial class ProjectItemViewModel
             return;
         }
 
-        if (targetAccount is not null && Placement.Account is { } owner && !owner.Is(targetAccount)
-            && owner.Host.Equals(targetAccount.Host, StringComparison.OrdinalIgnoreCase)
-            && Remote is { IsGitHub: true, FullName: { } fullName } && !Placement.IsCollaborator(targetAccount))
+        // Déposé sur l'onglet d'un autre compte : partager le repo (F3A), ajouter un second repo (F3B) ou remplacer le lien.
+        if (targetAccount is not null && !targetAccount.Is(Placement.Account))
         {
-            var choice = host.Dialogs.Choose($"« {Name} » et {targetAccount.Login}",
-                $"Que faire de « {Name} » avec le compte {targetAccount.Login} ?",
-                [
-                    $"Donner accès à {targetAccount.Login} (collaborateur) : le repo reste chez {owner.Login}, les deux comptes peuvent envoyer",
-                    $"Relier le projet à un repo de {targetAccount.Login} (nouveau repo ou transfert)…",
-                ]);
-            if (choice < 0) return;
-            if (choice == 0)
+            var options = new List<(string Label, Func<Task> Run)>();
+            if (Placement.Account is { } owner && owner.Host.Equals(targetAccount.Host, StringComparison.OrdinalIgnoreCase)
+                && Remote is { IsGitHub: true, FullName: { } fullName } && !Placement.IsCollaborator(targetAccount))
+                options.Add(($"Donner accès à {targetAccount.Login} (collaborateur) : le repo reste chez {owner.Login}, les deux comptes peuvent envoyer",
+                    async () =>
+                    {
+                        await RunAsync("Ajouter un collaborateur", () => Collaboration.AddAsync(host, owner, fullName, targetAccount.Login));
+                        await host.ReloadCollaborationsAsync();
+                    }));
+            if (!Placement.HasLinkFor(targetAccount))
+                options.Add(($"Ajouter aussi un repo de {targetAccount.Login} : le projet sera lié aux deux repos…", () => OpenAddLinkAsync(targetAccount)));
+            options.Add(($"Relier le projet à un repo de {targetAccount.Login} à la place du lien actuel (nouveau repo ou transfert)…",
+                () => RepointAsync(targetAccount)));
+
+            if (options.Count > 1)
             {
-                await RunAsync("Ajouter un collaborateur", () => Collaboration.AddAsync(host, owner, fullName, targetAccount.Login));
-                await host.ReloadCollaborationsAsync();
+                var choice = host.Dialogs.Choose($"« {Name} » et {targetAccount.Login}",
+                    $"Que faire de « {Name} » avec le compte {targetAccount.Login} ?", options.Select(o => o.Label).ToList());
+                if (choice >= 0) await options[choice].Run();
                 return;
             }
         }
+        await RepointAsync(targetAccount);
+    }
 
+    private async Task RepointAsync(GitHubAccount? targetAccount)
+    {
         var dialog = new RepointViewModel(this, host, targetAccount);
         host.Dialogs.ShowRepoint(dialog);
-        if (dialog.Done) await host.RescanAsync(Path);
+        if (!dialog.Done) return;
+        if (dialog.SelectedAccount is { } target) await host.ReloadRepositoriesAsync(target); // repo peut-être créé sur ce compte
+        await host.RescanAsync(Path);
     }
 }

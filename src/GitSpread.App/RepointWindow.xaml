@@ -50,6 +50,14 @@
                         <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" DisplayMemberPath="Login" />
                     </controls:Field>
 
+                    <!-- F3B : nom du lien secondaire -->
+                    <StackPanel Visibility="{Binding IsAddLink, Converter={StaticResource BoolToVisibility}}">
+                        <controls:Field Label="Nom du lien" Error="{Binding LinkNameError}" Margin="0,16,0,0"
+                                        Hint="Le lien principal reste « origin ». Ce nom identifie le nouveau lien dans GitSpread et dans un terminal (ex. git push samuelnitram).">
+                            <TextBox Text="{Binding LinkName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Nom du lien" />
+                        </controls:Field>
+                    </StackPanel>
+
                     <!-- Mode (seulement vers un autre compte) -->
                     <StackPanel Visibility="{Binding CanNativeTransfer, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="Que veux-tu faire ?" Style="{StaticResource FieldLabel}" />
@@ -140,8 +148,8 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="Ancien lien" Style="{StaticResource FieldLabel}" Visibility="{Binding HasCurrentLink, Converter={StaticResource BoolToVisibility}}" />
-                        <StackPanel Visibility="{Binding HasCurrentLink, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Ancien lien" Style="{StaticResource FieldLabel}" Visibility="{Binding ShowOldLinkChoice, Converter={StaticResource BoolToVisibility}}" />
+                        <StackPanel Visibility="{Binding ShowOldLinkChoice, Converter={StaticResource BoolToVisibility}}">
                             <RadioButton GroupName="OldLink" IsChecked="{Binding KeepOldLink}" Margin="0,2" Content="Le garder sous le nom « old-origin » (recommandé : rien n'est perdu)" />
                             <RadioButton GroupName="OldLink" IsChecked="{Binding KeepOldLink, Converter={StaticResource Not}}" Margin="0,2" Content="Le supprimer du projet (le repo sur GitHub n'est pas touché)" />
                         </StackPanel>

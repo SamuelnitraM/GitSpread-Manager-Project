@@ -27,8 +27,10 @@ public sealed partial class RepointViewModel : FormViewModel
     private Task _analysis = Task.CompletedTask;
     private readonly RepositoryNameCheck _nameCheck;
 
-    public RepointViewModel(ProjectItemViewModel project, IProjectHost host, GitHubAccount? targetAccount)
+    /// <param name="addLink">F3B : ajouter un repo comme lien secondaire au lieu de remplacer le lien actuel.</param>
+    public RepointViewModel(ProjectItemViewModel project, IProjectHost host, GitHubAccount? targetAccount, bool addLink = false)
     {
+        IsAddLink = addLink;
         _project = project;
         _host = host;
         _logger = host.Services.LoggerFactory.CreateLogger<RepointViewModel>();
@@ -41,7 +43,8 @@ public sealed partial class RepointViewModel : FormViewModel
         NewName = project.Remote?.Repository ?? RepositoryName.FromFolder(project.Name);
         CreateNew = true;
         NewBranchName = BranchName.ReplaceSpaces($"import-{project.BranchLabel}");
-        SignWithTarget = SelectedAccount is { } target && target.Login != project.Placement.Account?.Login;
+        SignWithTarget = !addLink && SelectedAccount is { } target && target.Login != project.Placement.Account?.Login;
+        if (addLink && SelectedAccount is { } linkAccount) LinkName = ProjectLinks.SuggestName(linkAccount.Login, TakenLinkNames);
         _ready = true;
         ValidateNewName();
         UpdatePreview();
@@ -57,11 +60,32 @@ public sealed partial class RepointViewModel : FormViewModel
         var r => r.Url,
     };
     public bool HasCurrentLink => _project.HasRemote;
+
+    // ------------------------------------------------------------ F3B : ajouter un lien secondaire
+
+    public bool IsAddLink { get; }
+    public bool ShowOldLinkChoice => HasCurrentLink && !IsAddLink;
+    [ObservableProperty] public partial string LinkName { get; set; } = "";
+    [ObservableProperty] public partial string? LinkNameError { get; set; }
+    private bool _linkNameEdited;
+    private bool _suggestingLinkName;
+    private IEnumerable<string> TakenLinkNames => _project.Project.AllRemotes.Select(r => r.Name);
+
+    partial void OnLinkNameChanged(string value)
+    {
+        if (!_ready) return;
+        if (!_suggestingLinkName) _linkNameEdited = true;
+        ValidateLinkName();
+        UpdatePreview();
+    }
+
+    private void ValidateLinkName() =>
+        LinkNameError = IsAddLink && (Submitted || LinkName.Length > 0) ? ProjectLinks.ValidateName(LinkName.Trim(), TakenLinkNames) : null;
     public bool HasUncommittedChanges => !_project.IsClean;
     public IReadOnlyList<GitHubAccount> Accounts { get; }
 
     /// <summary>Le transfert natif n'a de sens que pour un repo GitHub appartenant à un compte connecté, vers un autre compte.</summary>
-    public bool CanNativeTransfer => _project.Placement.Account is { } owner && _project.Remote is { IsGitHub: true }
+    public bool CanNativeTransfer => !IsAddLink && _project.Placement.Account is { } owner && _project.Remote is { IsGitHub: true }
                                      && SelectedAccount is { } t && t.Login != owner.Login && t.Host == owner.Host;
     public string SourceAccountLogin => _project.Placement.Account?.Login ?? "";
 
@@ -105,7 +129,8 @@ public sealed partial class RepointViewModel : FormViewModel
     public bool IsForm => Step == RepointStep.Form;
     public bool Done { get; private set; }
     public bool HasTargetSummary => TargetSummary is not null;
-    public string Title => SelectedAccount is { } a && a.Login != _project.Placement.Account?.Login && _project.Placement.Account is not null
+    public string Title => IsAddLink ? $"Ajouter un lien à « {_project.Name} »"
+        : SelectedAccount is { } a && a.Login != _project.Placement.Account?.Login && _project.Placement.Account is not null
         ? $"Passer « {_project.Name} » sur le compte {a.Login}"
         : $"Changer le repo lié à « {_project.Name} »";
 
@@ -117,7 +142,13 @@ public sealed partial class RepointViewModel : FormViewModel
         if (!CanNativeTransfer) Mode = RepointMode.Repoint;
         AccountError = null;
         // Changer de compte : par défaut, les commits suivent (on ne garde l'identité que pour le même compte).
-        SignWithTarget = value is not null && value.Login != _project.Placement.Account?.Login;
+        SignWithTarget = !IsAddLink && value is not null && value.Login != _project.Placement.Account?.Login;
+        if (IsAddLink && value is not null && !_linkNameEdited)
+        {
+            _suggestingLinkName = true;
+            LinkName = ProjectLinks.SuggestName(value.Login, TakenLinkNames);
+            _suggestingLinkName = false;
+        }
         OnPropertyChanged(nameof(SignWithTargetLabel));
         _ = LoadRepositoriesAsync();
         ValidateNewName();
@@ -185,9 +216,10 @@ public sealed partial class RepointViewModel : FormViewModel
         IsLoadingRepos = true;
         try
         {
-            var currentFull = _project.Remote?.FullName;
+            // Repos auxquels le projet est déjà lié : inutile de les proposer.
+            var linked = _project.Project.AllRemotes.Select(r => r.Url.FullName).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
             _allRepos = (await _host.Services.GitHub.ListRepositoriesAsync(account))
-                .Where(r => !r.IsArchived && !r.FullName.Equals(currentFull, StringComparison.OrdinalIgnoreCase))
+                .Where(r => !r.IsArchived && !linked.Contains(r.FullName))
                 .ToList();
             ApplyRepoFilter();
         }
@@ -251,7 +283,8 @@ public sealed partial class RepointViewModel : FormViewModel
             OldRemote = KeepOldLink ? OldRemoteAction.KeepAsOldOrigin : OldRemoteAction.Remove,
             Scope = PushAllBranches ? PushScope.AllBranchesAndTags : PushScope.CurrentBranch,
             PushToNewBranch = TargetDiverges && UseNewBranch ? NewBranchName.Trim() : null,
-            RemoteName = _project.Project.RemoteName ?? "origin",
+            RemoteName = IsAddLink ? LinkName.Trim() : _project.Project.RemoteName ?? "origin",
+            KeepCurrentLink = IsAddLink,
         };
     }
 
@@ -320,7 +353,8 @@ public sealed partial class RepointViewModel : FormViewModel
             ? "Ce repo a un historique différent : coche « Envoyer ma branche actuelle sur une nouvelle branche », ou choisis un autre repo."
             : null;
         ValidateNewBranchName();
-        return AccountError is null && NewNameError is null && RepositoryChoiceError is null && DivergeError is null && NewBranchNameError is null;
+        ValidateLinkName();
+        return LinkNameError is null && AccountError is null && NewNameError is null && RepositoryChoiceError is null && DivergeError is null && NewBranchNameError is null;
     }
 
     /// <summary>Les prochains commits seront attribués au compte cible (si demandé). Renvoie la phrase à ajouter au compte rendu.</summary>

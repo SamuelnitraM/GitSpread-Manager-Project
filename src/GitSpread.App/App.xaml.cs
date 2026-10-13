@@ -53,6 +53,7 @@ public partial class App : Application
             Integrator: new BranchIntegrator(git),
             Transfer: new TransferService(git, gitHub, credentials),
             Linked: new LinkedProjects(git, credentials),
+            Links: new ProjectLinks(git, credentials),
             SshKeys: new SshKeyService(runner),
             Scanner: new ProjectScanner(),
             SettingsStore: new SettingsStore(SettingsStore.DefaultPath),

@@ -150,6 +150,7 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
                 _ => $"{identity.Name ?? "(sans nom)"} <{identity.Email ?? "sans e-mail"}>",
             };
             await LoadBranchStateAsync();
+            await LoadLinksAsync(status.IsDetached ? null : status.Branch);
             HasDetails = true;
             _ = LoadIdentitySafeAsync(); // profils GitHub : chargés sans retarder l'affichage du panneau
         }
@@ -175,11 +176,21 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     }
 
     [RelayCommand]
-    private Task FetchAsync() => RunNetworkAsync("Récupérer", async auth =>
-    {
-        var result = await Git.FetchAsync(Path, Project.RemoteName ?? "origin", auth);
-        return ActionLog.From("Récupérer", [result], "Infos à jour : GitSpread sait maintenant ce qui a changé sur GitHub.");
-    });
+    private Task FetchAsync() => Placement.HasSecondaryLinks
+        ? RunAsync("Récupérer", async () =>
+        {
+            // Plusieurs liens (F3B) : chacun est interrogé avec son propre compte.
+            var results = await host.Services.Links.FetchAsync(Path, Placement.Links);
+            return new ActionLog("Récupérer", results.All(r => r.Succeeded),
+                "Infos à jour pour chaque lien :\n" + string.Join("\n", results.Select(r => r.Message)),
+                string.Join("\n", results.Select(r => r.Result.Command)),
+                string.Join("\n", results.Select(r => r.Result.Output).Where(o => o.Length > 0)));
+        })
+        : RunNetworkAsync("Récupérer", async auth =>
+        {
+            var result = await Git.FetchAsync(Path, Project.RemoteName ?? "origin", auth);
+            return ActionLog.From("Récupérer", [result], "Infos à jour : GitSpread sait maintenant ce qui a changé sur GitHub.");
+        });
 
     [RelayCommand]
     private Task PullAsync() => RunNetworkAsync("Tirer", async auth =>
@@ -201,6 +212,16 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
         if (!_status.HasCommits)
             return ActionLog.Failure("Pousser", "Il n'y a encore aucun commit à envoyer. Fais d'abord un commit.");
 
+        // Plusieurs liens (F3B) : envoi vers les liens cochés, chacun avec son compte.
+        if (Placement.HasSecondaryLinks)
+        {
+            var targets = SelectedLinks;
+            if (targets.Count == 0) return ActionLog.Failure("Pousser", "Aucun lien coché dans « Envoyer vers » : coche au moins un repo.");
+            if (targets is not [{ IsPrimary: true }])
+                return await PushToLinksAsync(branch, targets, setPrimaryUpstream: _status.Upstream is null);
+            await RememberPushTargetsAsync();
+        }
+
         var result = await Git.PushAsync(Path, Project.RemoteName ?? "origin", branch, setUpstream: _status.Upstream is null, auth);
         return ActionLog.From("Pousser", [result], result.Output.Contains("Everything up-to-date")
             ? "Rien de nouveau à envoyer."
@@ -217,7 +238,7 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
         await RunAsync("Commit", async () =>
         {
             var paths = dialog.AllSelected ? null : dialog.SelectedPathspecs;
-            var results = await Git.CommitAsync(Path, dialog.Message, paths);
+            var results = await Git.CommitAsync(Path, dialog.FinalMessage, paths);
             return ActionLog.From("Commit", results, $"Commit « {dialog.Message.Trim().Split('\n')[0]} » créé.");
         });
         if (dialog.PushAfterCommit && LastAction is { Succeeded: true } && CanSync) await PushAsync();
