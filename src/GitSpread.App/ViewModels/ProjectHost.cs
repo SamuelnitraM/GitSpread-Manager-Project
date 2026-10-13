@@ -36,6 +36,10 @@ public interface IProjectHost
     Task RescanAsync(string? revealPath = null);
 
     Task RemoveExtraProjectAsync(string path);
+
+    /// <summary>Range un projet sans remote dans les projets locaux d'un compte, ou le remet dans « Non liés » (null).
+    /// Rien n'est créé sur GitHub.</summary>
+    Task AssignProjectAsync(string path, GitHubAccount? account);
 }
 
 /// <summary>Fenêtres modales, ouvertes par l'interface (les ViewModels ne connaissent pas WPF).</summary>

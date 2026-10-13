@@ -154,6 +154,21 @@ public class SharedProjectPlacementTests
     }
 
     [Fact]
+    public void A_project_without_remote_can_be_filed_under_a_connected_account()
+    {
+        string? Lookup(string path) => path == @"C:\p" ? "github.com/samuelnitram" : null;
+
+        var noGit = ProjectClassifier.Place(new LocalProject(@"C:\p") { IsRepository = false }, [Pro, Perso], null, Lookup);
+        var noRemote = ProjectClassifier.Place(new LocalProject(@"C:\p"), [Pro, Perso], null, Lookup);
+        Assert.True(noGit is { Account.Login: "SamuelnitraM", Reason: null, IsAssigned: true });
+        Assert.True(noRemote is { Account.Login: "SamuelnitraM", Reason: null, IsAssigned: true });
+
+        // Une fois publié, c'est le propriétaire du remote qui compte ; un compte déconnecté renvoie dans « Non liés ».
+        Assert.True(ProjectClassifier.Place(Project("https://github.com/SmartDev-Web/p.git"), [Pro, Perso], null, Lookup) is { Account.Login: "SmartDev-Web", IsAssigned: false });
+        Assert.Equal(UnlinkedReason.NoRemote, ProjectClassifier.Place(new LocalProject(@"C:\p"), [Pro], null, Lookup).Reason);
+    }
+
+    [Fact]
     public void The_owner_is_never_its_own_collaborator()
     {
         var index = new CollaborationIndex();

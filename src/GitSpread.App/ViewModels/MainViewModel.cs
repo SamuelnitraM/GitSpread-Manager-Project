@@ -176,6 +176,13 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         await RescanAsync(added[0]);
     }
 
+    public async Task AssignProjectAsync(string path, GitHubAccount? account)
+    {
+        Settings.SetProjectAccount(path, account is null ? null : AppSettings.AccountKey(account.Host, account.Login));
+        _services.SettingsStore.Save(Settings);
+        await RescanAsync(path); // le projet s'affiche aussitôt dans son nouvel onglet
+    }
+
     public async Task RemoveExtraProjectAsync(string path)
     {
         Settings.ExtraProjects.RemoveAll(p => p.Equals(path, StringComparison.OrdinalIgnoreCase));
@@ -359,7 +366,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         foreach (var tab in AccountTabs)
             foreach (var repo in tab.Collaborations) collaborations.Add(tab.Account, repo.FullName);
 
-        var placements = ProjectClassifier.Classify(_projects, _accounts, collaborations);
+        var placements = ProjectClassifier.Classify(_projects, _accounts, collaborations, Settings.ProjectAccount);
         foreach (var tab in AccountTabs)
             tab.SetProjects(placements
                 .Where(p => tab.Account.Is(p.Account) || p.IsCollaborator(tab.Account))

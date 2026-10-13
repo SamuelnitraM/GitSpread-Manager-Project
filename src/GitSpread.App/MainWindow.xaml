@@ -50,8 +50,14 @@
                     </StackPanel>
                 </Border>
                 <TextBlock Text="{Binding HostLabel}" Foreground="{DynamicResource Muted}" Margin="6,0,0,0" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding ProjectCount}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" VerticalAlignment="Center"
-                           ToolTip="Projets locaux rattachés à ce compte" />
+                <StackPanel Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center" ToolTip="Projets sur ce poste rattachés à ce compte">
+                    <TextBlock Text="&#xE80F;" Style="{StaticResource Glyph}" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding ProjectCount}" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="Repos sur GitHub (y compris ceux où ce compte est collaborateur)">
+                    <TextBlock Text="&#xE753;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource Muted}" Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding RepositoryCount}" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
                 <Button Style="{StaticResource GhostButton}" Margin="4,0,0,0" Padding="6,1" Click="Switch_Click" AutomationProperties.Name="Changer de compte actif"
                         Visibility="{Binding CanSwitch, Converter={StaticResource BoolToVisibility}}"
                         ToolTip="Changer le compte actif de gh (gh auth switch)">
@@ -77,7 +83,10 @@
             <StackPanel Orientation="Horizontal" Margin="2,1">
                 <TextBlock Text="&#xE71B;" Style="{StaticResource Glyph}" Margin="0,0,8,0" />
                 <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding ProjectCount}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center" ToolTip="Projets sur ce poste">
+                    <TextBlock Text="&#xE80F;" Style="{StaticResource Glyph}" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding ProjectCount}" Foreground="{DynamicResource Muted}" />
+                </StackPanel>
             </StackPanel>
         </DataTemplate>
 

@@ -26,7 +26,22 @@ public sealed class AppSettings
     /// en plus de ceux que GitHub expose publiquement.</summary>
     public Dictionary<string, List<string>> AccountEmails { get; set; } = [];
 
+    /// <summary>Projets sans remote rangés à la main dans un compte (chemin → clé « hôte/login »).</summary>
+    public Dictionary<string, string> ProjectAccounts { get; set; } = [];
+
     public static string AccountKey(string host, string login) => $"{host}/{login}".ToLowerInvariant();
+
+    /// <summary>Compte (clé « hôte/login ») dans lequel ce projet a été rangé, ou null.</summary>
+    public string? ProjectAccount(string path) =>
+        ProjectAccounts.FirstOrDefault(p => p.Key.Equals(path, StringComparison.OrdinalIgnoreCase)).Value;
+
+    /// <summary>Range un projet dans un compte, ou le remet dans « Non liés » (null).</summary>
+    public void SetProjectAccount(string path, string? accountKey)
+    {
+        foreach (var key in ProjectAccounts.Keys.Where(k => k.Equals(path, StringComparison.OrdinalIgnoreCase)).ToList())
+            ProjectAccounts.Remove(key);
+        if (accountKey is not null) ProjectAccounts[path] = accountKey;
+    }
 
     public bool IsKnownEmail(string host, string login, string? email) =>
         email is not null && AccountEmails.TryGetValue(AccountKey(host, login), out var emails)

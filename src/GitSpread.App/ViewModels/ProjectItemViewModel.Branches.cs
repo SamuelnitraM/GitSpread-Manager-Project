@@ -244,14 +244,16 @@ public sealed partial class ProjectItemViewModel
 
     /// <summary>
     /// Ouvre l'assistant de repointage, éventuellement vers un compte précis (projet déposé sur son onglet).
-    /// Un projet sans remote (ou pas encore suivi par git) n'a rien à repointer : on propose de le publier sur ce compte.
+    /// Un projet sans remote (ou pas encore suivi par git) n'a rien à repointer : déposé sur un onglet, il est simplement
+    /// rangé dans les projets locaux de ce compte, sans rien créer sur GitHub.
     /// Déposé sur l'onglet d'un autre compte, un projet lié peut aussi simplement être partagé avec ce compte (F3A).
     /// </summary>
     public async Task ChangeLinkedRepositoryAsync(GitHubAccount? targetAccount)
     {
         if (!HasRemote)
         {
-            await PublishToAsync(targetAccount);
+            if (targetAccount is not null) await AssignToAsync(targetAccount);
+            else await PublishAsync();
             return;
         }
 

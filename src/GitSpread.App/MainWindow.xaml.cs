@@ -187,15 +187,22 @@ public partial class MainWindow : Window
 
         if (e.Data.GetData(TabFormat) is TabViewModel dragged && dragged != target)
             ViewModel.MoveTab(dragged, target, after: hint == DropHint.InsertAfter || e.GetPosition(item).X >= item.ActualWidth / 2);
-        else if (e.Data.GetData(ProjectFormat) is ProjectItemViewModel project && target is AccountTabViewModel account && CanReceive(target, project))
-            await project.ChangeLinkedRepositoryAsync(account.Account);
+        else if (e.Data.GetData(ProjectFormat) is ProjectItemViewModel project && CanReceive(target, project))
+        {
+            if (target is AccountTabViewModel account) await project.ChangeLinkedRepositoryAsync(account.Account);
+            else await project.AssignToAsync(null);
+        }
     }
 
     /// <summary>
     /// Un projet peut être déposé sur l'onglet d'un autre compte connecté : passer le projet sur ce compte (étape 5),
-    /// ou le publier sur ce compte s'il n'a pas encore de remote (même s'il n'est pas encore suivi par git).
+    /// ou, s'il n'a pas encore de remote (même pas suivi par git), le ranger dans les projets locaux de ce compte.
+    /// Un projet rangé ainsi peut être redéposé sur « Non liés ».
     /// </summary>
-    private static bool CanReceive(TabViewModel target, ProjectItemViewModel project) =>
-        target is AccountTabViewModel { Account.IsAuthenticated: true } account
-        && (project.Placement.Account is not { } owner || owner.Login != account.Login || owner.Host != account.Account.Host);
+    private static bool CanReceive(TabViewModel target, ProjectItemViewModel project) => target switch
+    {
+        AccountTabViewModel { Account.IsAuthenticated: true } account => !account.Account.Is(project.Placement.Account),
+        UnlinkedTabViewModel => project.IsAssigned,
+        _ => false,
+    };
 }

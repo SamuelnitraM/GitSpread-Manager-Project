@@ -1,4 +1,5 @@
 using GitSpread.Core.Accounts;
+using GitSpread.Core.Settings;
 
 namespace GitSpread.Core.Projects;
 
@@ -32,6 +33,9 @@ public sealed record ProjectPlacement(LocalProject Project, GitHubAccount? Accou
         ?? AccessAccounts.FirstOrDefault();
 
     public bool IsCollaborator(GitHubAccount account) => Collaborators.Any(c => c.Is(account));
+
+    /// <summary>Projet sans remote rangé à la main dans le compte <see cref="Account"/> (glissé sur son onglet) : pas encore sur GitHub.</summary>
+    public bool IsAssigned { get; init; }
 }
 
 /// <summary>Repos sur lesquels chaque compte connecté est collaborateur (sans en être propriétaire).</summary>
@@ -57,14 +61,23 @@ public sealed class CollaborationIndex
 /// <summary>Range chaque projet dans l'onglet du compte propriétaire de son remote, et dans ceux de ses collaborateurs.</summary>
 public static class ProjectClassifier
 {
+    /// <param name="assignedAccount">Compte (clé « hôte/login ») dans lequel un projet sans remote a été rangé à la main.</param>
     public static IReadOnlyList<ProjectPlacement> Classify(IEnumerable<LocalProject> projects, IReadOnlyList<GitHubAccount> accounts,
-        CollaborationIndex? collaborations = null) =>
-        projects.Select(p => Place(p, accounts, collaborations)).ToList();
+        CollaborationIndex? collaborations = null, Func<string, string?>? assignedAccount = null) =>
+        projects.Select(p => Place(p, accounts, collaborations, assignedAccount)).ToList();
 
-    public static ProjectPlacement Place(LocalProject project, IReadOnlyList<GitHubAccount> accounts, CollaborationIndex? collaborations = null)
+    public static ProjectPlacement Place(LocalProject project, IReadOnlyList<GitHubAccount> accounts, CollaborationIndex? collaborations = null,
+        Func<string, string?>? assignedAccount = null)
     {
-        if (!project.IsRepository) return new(project, null, UnlinkedReason.NotARepository);
-        if (project.Remote is not { } remote) return new(project, null, UnlinkedReason.NoRemote);
+        if (!project.IsRepository || project.Remote is null)
+        {
+            // Pas encore sur GitHub : rangé dans le compte choisi par l'utilisateur, sinon dans « Non liés ».
+            if (assignedAccount?.Invoke(project.Path) is { } key
+                && accounts.FirstOrDefault(a => AppSettings.AccountKey(a.Host, a.Login) == key) is { } account)
+                return new(project, account, null) { IsAssigned = true };
+            return new(project, null, project.IsRepository ? UnlinkedReason.NoRemote : UnlinkedReason.NotARepository);
+        }
+        var remote = project.Remote;
 
         var onHost = accounts.Where(a => a.Host.Equals(remote.Host, StringComparison.OrdinalIgnoreCase)).ToList();
         if (onHost.Count == 0 || remote.Owner is null || remote.FullName is not { } fullName) return new(project, null, UnlinkedReason.OtherHost);

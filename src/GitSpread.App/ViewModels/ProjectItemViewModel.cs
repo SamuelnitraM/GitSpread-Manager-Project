@@ -224,15 +224,29 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     }
 
     [RelayCommand]
-    private Task PublishAsync() => PublishToAsync(null);
-
-    /// <summary>Ouvre l'assistant de publication, éventuellement sur un compte précis (projet déposé sur son onglet).</summary>
-    public async Task PublishToAsync(GitHubAccount? targetAccount)
+    private async Task PublishAsync()
     {
-        var dialog = new PublishViewModel(this, host, targetAccount);
+        var dialog = new PublishViewModel(this, host); // compte proposé : celui où le projet est rangé
         host.Dialogs.ShowPublish(dialog);
         if (dialog.Published) await host.RescanAsync(Path);
     }
+
+    // ------------------------------------------------------------ projet local rangé dans un compte
+
+    /// <summary>Projet sans remote glissé sur l'onglet d'un compte : rangé là, mais pas encore sur GitHub.</summary>
+    public bool IsAssigned => Placement.IsAssigned;
+
+    /// <summary>Dans « Non liés », un projet sans remote peut être glissé sur l'onglet d'un compte.</summary>
+    public bool ShowAssignHint => IsUnlinked && !HasRemote;
+    public string AssignedLabel => Placement is { IsAssigned: true, Account: { } account }
+        ? $"Projet local rangé dans {account.Login} : il n'est pas encore sur GitHub. « Publier sur GitHub » créera son repo sur ce compte."
+        : "";
+
+    /// <summary>Range ce projet (sans remote) dans les projets locaux d'un compte, ou le remet dans « Non liés » (null).</summary>
+    public Task AssignToAsync(GitHubAccount? account) => host.AssignProjectAsync(Path, account);
+
+    [RelayCommand]
+    private Task Unassign() => AssignToAsync(null);
 
     [RelayCommand]
     private async Task RemoveFromListAsync()

@@ -117,6 +117,20 @@
                                 Visibility="{Binding IsUnlinked, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding UnlinkedReasonLabel}" TextWrapping="Wrap" Foreground="{DynamicResource Warning}" />
                         </Border>
+                        <TextBlock Text="Astuce : glisse ce projet sur l'onglet d'un compte pour le ranger dans ses projets locaux (rien n'est créé sur GitHub)."
+                                   Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Visibility="{Binding ShowAssignHint, Converter={StaticResource BoolToVisibility}}" />
+
+                        <!-- Projet sans remote rangé à la main dans ce compte -->
+                        <Border Margin="0,10,0,0" Background="{DynamicResource AccentSoft}" CornerRadius="6" Padding="10,6"
+                                Visibility="{Binding IsAssigned, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding AssignedLabel}" TextWrapping="Wrap" />
+                                <Button Style="{StaticResource GhostButton}" Command="{Binding UnassignCommand}" HorizontalAlignment="Left" Margin="-6,4,0,0"
+                                        AutomationProperties.Name="Remettre dans Non liés" Content="Remettre dans « Non liés »"
+                                        ToolTip="Le projet quitte cet onglet ; ses fichiers ne sont pas touchés. Tu peux aussi le glisser sur l'onglet « Non liés »." />
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Text="DÉPÔT LIÉ" Style="{StaticResource SectionLabel}" />
                         <StackPanel Orientation="Horizontal">
@@ -178,7 +192,7 @@
                                     <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Initialiser git" /></StackPanel>
                                 </Button>
                                 <Button Style="{StaticResource PrimaryButton}" Command="{Binding PublishCommand}" AutomationProperties.Name="Publier sur GitHub" Margin="0,0,8,8"
-                                        ToolTip="Créer un repo GitHub pour ce projet et l'y envoyer. Tu peux aussi glisser le projet sur l'onglet du compte voulu.">
+                                        ToolTip="Créer un repo GitHub pour ce projet et l'y envoyer.">
                                     <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE898;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Publier sur GitHub…" /></StackPanel>
                                 </Button>
                             </WrapPanel>
@@ -190,7 +204,7 @@
                                 <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE73E;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Commit…" /></StackPanel>
                             </Button>
                             <Button Style="{StaticResource PrimaryButton}" Command="{Binding PublishCommand}" AutomationProperties.Name="Publier sur GitHub" Margin="0,0,8,8"
-                                    ToolTip="Créer un repo GitHub pour ce projet et l'y envoyer. Tu peux aussi glisser le projet sur l'onglet du compte voulu.">
+                                    ToolTip="Créer un repo GitHub pour ce projet et l'y envoyer.">
                                 <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE898;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Publier sur GitHub…" /></StackPanel>
                             </Button>
                         </WrapPanel>

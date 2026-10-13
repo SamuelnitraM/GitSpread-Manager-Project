@@ -67,6 +67,12 @@ public sealed class TestHost : IProjectHost, IDialogService
     public Task RescanAsync(string? revealPath = null) => Task.CompletedTask;
     public Task RemoveExtraProjectAsync(string path) => Task.CompletedTask;
 
+    public Task AssignProjectAsync(string path, GitHubAccount? account)
+    {
+        Settings.SetProjectAccount(path, account is null ? null : AppSettings.AccountKey(account.Host, account.Login));
+        return Task.CompletedTask;
+    }
+
     /// <summary>Projet local de test (rien n'est lu sur le disque tant qu'on ne charge pas ses détails).</summary>
     public ProjectItemViewModel Project(string name = "Mon projet", GitHubAccount? account = null, string? remote = null, string? path = null) =>
         new(new ProjectPlacement(
