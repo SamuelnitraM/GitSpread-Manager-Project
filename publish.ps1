@@ -7,9 +7,15 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
 Write-Host "`n== Tests ==" -ForegroundColor Cyan
-dotnet test tests/GitSpread.Tests -c Release --nologo
+dotnet test GitSpread.slnx -c Release --nologo
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`nTests en échec : exécutable NON généré." -ForegroundColor Red
+    exit 1
+}
+
+$running = Get-Process GitSpread -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $PSScriptRoot 'dist\GitSpread.exe') }
+if ($running) {
+    Write-Host "`nGitSpread est ouvert (dist\GitSpread.exe) : ferme-le puis relance ce script pour remplacer l'exécutable." -ForegroundColor Yellow
     exit 1
 }
 

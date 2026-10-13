@@ -4,6 +4,7 @@
     <Project Path="src/GitSpread.Core/GitSpread.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/GitSpread.App.Tests/GitSpread.App.Tests.csproj" />
     <Project Path="tests/GitSpread.Tests/GitSpread.Tests.csproj" />
   </Folder>
 </Solution>

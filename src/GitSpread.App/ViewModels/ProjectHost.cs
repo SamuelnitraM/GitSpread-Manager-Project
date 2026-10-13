@@ -31,8 +31,9 @@ public interface IDialogService
     /// <summary>Choix parmi plusieurs réponses : index choisi, ou -1 si annulé.</summary>
     int Choose(string title, string message, IReadOnlyList<string> options);
 
-    /// <summary>Saisie d'un texte court : null si annulé.</summary>
-    string? Prompt(string title, string message, string initialValue);
+    /// <summary>Saisie d'un texte court : null si annulé. <paramref name="validate"/> renvoie le message d'erreur
+    /// affiché sous le champ (la fenêtre reste ouverte tant qu'il y en a un).</summary>
+    string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false);
 }
 
 /// <summary>Compte rendu de la dernière action lancée sur un projet : commandes, résultat en clair, sortie brute.</summary>

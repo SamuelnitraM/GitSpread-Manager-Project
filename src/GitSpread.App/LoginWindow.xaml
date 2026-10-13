@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+        xmlns:controls="clr-namespace:GitSpread.App.Controls"
         mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:LoginWizardViewModel}"
         Title="Connecter un compte GitHub" Width="640" Height="620" MinWidth="520" MinHeight="520"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip"
@@ -72,8 +73,10 @@
                         <StackPanel>
                             <TextBlock Text="Autre (GitHub Enterprise Server)" Style="{StaticResource ChoiceTitle}" />
                             <TextBlock Text="Le serveur GitHub de ton entreprise." Style="{StaticResource ChoiceText}" />
-                            <TextBox Text="{Binding CustomHost, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" Padding="4"
-                                     IsEnabled="{Binding UseGitHubCom, Converter={StaticResource Not}}" ToolTip="Nom d'hôte, ex. github.monentreprise.fr" />
+                            <controls:Field Error="{Binding HostError}" Margin="0,8,0,0">
+                                <TextBox Text="{Binding CustomHost, UpdateSourceTrigger=PropertyChanged}" Padding="4" AutomationProperties.Name="Nom d'hôte"
+                                         IsEnabled="{Binding UseGitHubCom, Converter={StaticResource Not}}" ToolTip="Nom d'hôte, ex. github.monentreprise.fr" />
+                            </controls:Field>
                         </StackPanel>
                     </RadioButton>
                 </StackPanel>
@@ -124,7 +127,8 @@
                                  Visibility="{Binding HasSshKeys, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="Utiliser une clé existante" Style="{StaticResource ChoiceTitle}" />
-                            <ComboBox ItemsSource="{Binding SshKeys}" SelectedItem="{Binding SelectedSshKey}" Margin="0,8,0,0"
+                            <controls:Field Error="{Binding SshKeyError}" Margin="0,8,0,0">
+                            <ComboBox ItemsSource="{Binding SshKeys}" SelectedItem="{Binding SelectedSshKey}" AutomationProperties.Name="Clé SSH"
                                       IsEnabled="{Binding SshChoice, Converter={StaticResource EnumToBool}, ConverterParameter=Existing}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
@@ -132,6 +136,7 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
+                            </controls:Field>
                         </StackPanel>
                     </RadioButton>
                     <RadioButton GroupName="SshChoice" Style="{StaticResource ChoiceCard}" IsChecked="{Binding SshChoice, Converter={StaticResource EnumToBool}, ConverterParameter=Generate}">
@@ -153,7 +158,9 @@
                     <StackPanel Visibility="{Binding SshChoice, Converter={StaticResource EnumToVisibility}, ConverterParameter=Existing|Generate}">
                         <TextBlock Text="Titre de la clé sur GitHub" Margin="0,6,0,2" />
                         <TextBlock Text="gh › ? Title for your SSH key:" Style="{StaticResource GhQuestion}" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding SshKeyTitle, UpdateSourceTrigger=PropertyChanged}" Padding="4" />
+                        <controls:Field Error="{Binding SshTitleError}">
+                            <TextBox Text="{Binding SshKeyTitle, UpdateSourceTrigger=PropertyChanged}" Padding="4" AutomationProperties.Name="Titre de la clé" />
+                        </controls:Field>
                     </StackPanel>
                 </StackPanel>
 
@@ -183,7 +190,9 @@
                 <StackPanel Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Token}">
                     <TextBlock Text="Colle ton token d'accès" Style="{StaticResource Question}" />
                     <TextBlock Text="gh › ? Paste your authentication token:" Style="{StaticResource GhQuestion}" />
-                    <PasswordBox x:Name="TokenBox" PasswordChanged="Token_Changed" Padding="6" FontFamily="Consolas" />
+                    <controls:Field Error="{Binding TokenError}">
+                        <PasswordBox x:Name="TokenBox" PasswordChanged="Token_Changed" Padding="6" FontFamily="Consolas" AutomationProperties.Name="Token d'accès" />
+                    </controls:Field>
                     <TextBlock Style="{StaticResource ChoiceText}" Margin="0,8,0,0">
                         Droits nécessaires : <Bold>repo</Bold>, <Bold>read:org</Bold> (et <Bold>admin:public_key</Bold> si tu envoies une clé SSH).
                         Le token est transmis directement à gh, qui le range dans le gestionnaire d'identifiants de Windows. GitSpread ne l'enregistre nulle part.
@@ -276,7 +285,6 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="0,8,0,0" />
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

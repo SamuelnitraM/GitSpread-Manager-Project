@@ -26,6 +26,6 @@ public sealed class DialogService : IDialogService
     public int Choose(string title, string message, IReadOnlyList<string> options) =>
         SmallDialogs.Choose(Owner, title, message, options);
 
-    public string? Prompt(string title, string message, string initialValue) =>
-        SmallDialogs.Prompt(Owner, title, message, initialValue);
+    public string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false) =>
+        SmallDialogs.Prompt(Owner, title, message, initialValue, validate, spacesToDash);
 }

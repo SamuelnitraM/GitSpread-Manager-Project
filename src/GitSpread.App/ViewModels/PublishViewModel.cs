@@ -12,19 +12,21 @@ namespace GitSpread.App.ViewModels;
 public enum PublishStep { Form, Running, Done, Failed }
 
 /// <summary>Publier un projet local (avec ou sans git) dans un nouveau repo GitHub du compte choisi.</summary>
-public sealed partial class PublishViewModel : ObservableObject
+public sealed partial class PublishViewModel : FormViewModel
 {
     public const string NoTemplate = "(aucun)";
 
     private readonly ProjectItemViewModel _project;
     private readonly IProjectHost _host;
     private readonly ILogger _logger;
+    private readonly RepositoryNameCheck _nameCheck;
 
     public PublishViewModel(ProjectItemViewModel project, IProjectHost host)
     {
         _project = project;
         _host = host;
         _logger = host.Services.LoggerFactory.CreateLogger<PublishViewModel>();
+        _nameCheck = new RepositoryNameCheck(host.Services.GitHub);
         Identity = new IdentityViewModel(project.Path, host);
 
         Accounts = host.Accounts.Where(a => a.IsAuthenticated).ToList();
@@ -36,6 +38,7 @@ public sealed partial class PublishViewModel : ObservableObject
         GuessedTemplate = HasGitignore ? null : GitignoreGuesser.Guess(project.Path);
         SelectedTemplate = GuessedTemplate ?? NoTemplate;
         _ready = true;
+        ValidateName();
         UpdatePreview();
     }
 
@@ -65,8 +68,12 @@ public sealed partial class PublishViewModel : ObservableObject
     [ObservableProperty] public partial bool UseSuggestedIdentity { get; set; }
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsForm))] public partial PublishStep Step { get; set; } = PublishStep.Form;
-    [ObservableProperty] public partial string? ValidationMessage { get; set; }
     [ObservableProperty] public partial string? ErrorMessage { get; set; }
+
+    // Erreurs affichées sous les champs (null = champ valide)
+    [ObservableProperty] public partial string? RepositoryNameError { get; set; }
+    [ObservableProperty] public partial string? AccountError { get; set; }
+    [ObservableProperty] public partial bool IsCheckingName { get; set; }
     [ObservableProperty] public partial string? RepositoryUrl { get; set; }
 
     public bool IsForm => Step == PublishStep.Form;
@@ -75,7 +82,9 @@ public sealed partial class PublishViewModel : ObservableObject
     partial void OnSelectedAccountChanged(GitHubAccount? value)
     {
         if (!_ready) return;
+        AccountError = null;
         _ = LoadIdentityAsync();
+        ValidateName();
         UpdatePreview();
     }
 
@@ -84,7 +93,29 @@ public sealed partial class PublishViewModel : ObservableObject
         await Identity.LoadAsync(SelectedAccount, IsRepository);
         UseSuggestedIdentity = Identity.HasWarning && Identity.CanUseSuggested;
     }
-    partial void OnRepositoryNameChanged(string value) { if (_ready) UpdatePreview(); }
+    partial void OnRepositoryNameChanged(string value)
+    {
+        if (!_ready) return;
+        ValidateName();
+        UpdatePreview();
+    }
+
+    /// <summary>Règles GitHub tout de suite, puis disponibilité du nom sur le compte (après une courte pause).</summary>
+    private void ValidateName(bool immediate = false)
+    {
+        var name = RepositoryName.Trim();
+        var error = Core.GitHub.RepositoryName.Validate(name);
+        if (name.Length == 0 && !Submitted) error = null; // pas de rouge avant la première tentative
+        RepositoryNameError = error;
+
+        if (error is null && name.Length > 0 && SelectedAccount is { } account)
+            _nameCheck.Schedule(account, name, immediate, checking => IsCheckingName = checking, taken =>
+            {
+                if (RepositoryName.Trim() == name) RepositoryNameError = taken;
+            });
+        else
+            _nameCheck.Cancel();
+    }
     partial void OnIsPrivateChanged(bool value) { if (_ready) UpdatePreview(); }
     partial void OnSelectedTemplateChanged(string value) { if (_ready) UpdatePreview(); }
     partial void OnCommitMessageChanged(string value) { if (_ready) UpdatePreview(); }
@@ -128,10 +159,15 @@ public sealed partial class PublishViewModel : ObservableObject
     [RelayCommand]
     private async Task PublishAsync()
     {
-        ValidationMessage = SelectedAccount is null ? "Connecte d'abord un compte GitHub (bouton « + »)."
-            : !Core.GitHub.RepositoryName.IsValid(RepositoryName.Trim()) ? "Nom de repo invalide : lettres, chiffres, « - », « _ » et « . » uniquement."
-            : null;
-        if (ValidationMessage is not null || BuildPlan() is not { } plan) return;
+        Submitted = true;
+        AccountError = SelectedAccount is null ? "Connecte d'abord un compte GitHub (bouton « + » à côté des onglets)." : null;
+        ValidateName(immediate: true);
+        await _nameCheck.Pending;
+        if (AccountError is not null || RepositoryNameError is not null || BuildPlan() is not { } plan)
+        {
+            RequestShowErrors();
+            return;
+        }
 
         Step = PublishStep.Running;
         Progress.Clear();

@@ -185,7 +185,7 @@ public sealed partial class ProjectItemViewModel
     {
         var name = host.Dialogs.Prompt("Nouvelle branche",
             $"Nom de la nouvelle branche, créée à partir de « {_status?.Branch ?? "la position actuelle"} ». Tes modifications en cours la suivent.",
-            "");
+            "", name => BranchName.Validate(name) ?? (Branches.Any(b => b.Name == name) ? "Une branche porte déjà ce nom." : null), spacesToDash: true);
         if (string.IsNullOrWhiteSpace(name)) return;
         await RunAsync("Nouvelle branche", async () =>
             ActionLog.From("Nouvelle branche", [await Git.CreateBranchAsync(Path, name.Trim())],

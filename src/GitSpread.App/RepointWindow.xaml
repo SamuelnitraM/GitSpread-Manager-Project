@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+        xmlns:controls="clr-namespace:GitSpread.App.Controls"
         mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:RepointViewModel}"
         Width="720" Height="800" MinWidth="580" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip"
@@ -45,19 +46,20 @@
 
                 <StackPanel Visibility="{Binding Step, Converter={StaticResource EnumToVisibility}, ConverterParameter=Form}">
                     <!-- Compte cible -->
-                    <TextBlock Text="Compte GitHub cible" Style="{StaticResource FieldLabel}" />
-                    <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" DisplayMemberPath="Login" />
+                    <controls:Field Label="Compte GitHub cible" Error="{Binding AccountError}" Margin="0,16,0,0">
+                        <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" DisplayMemberPath="Login" />
+                    </controls:Field>
 
                     <!-- Mode (seulement vers un autre compte) -->
                     <StackPanel Visibility="{Binding CanNativeTransfer, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="Que veux-tu faire ?" Style="{StaticResource FieldLabel}" />
-                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Mode" IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=Repoint}">
+                        <RadioButton AutomationProperties.Name="Repointer (recommandé)" Style="{StaticResource ChoiceCard}" GroupName="Mode" IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=Repoint}">
                             <StackPanel>
                                 <TextBlock Text="Repointer (recommandé)" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Hint}" Text="Ton dossier local garde son code et son historique, et est envoyé dans un repo du compte cible (existant ou nouveau). Le repo d'origine reste en place." />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Mode" IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=NativeTransfer}">
+                        <RadioButton AutomationProperties.Name="Transférer le repo GitHub" Style="{StaticResource ChoiceCard}" GroupName="Mode" IsChecked="{Binding Mode, Converter={StaticResource EnumToBool}, ConverterParameter=NativeTransfer}">
                             <StackPanel>
                                 <TextBlock Text="Transférer le repo GitHub" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Hint}">
@@ -70,7 +72,7 @@
                     <!-- ===== Repointer ===== -->
                     <StackPanel Visibility="{Binding Mode, Converter={StaticResource EnumToVisibility}, ConverterParameter=Repoint}">
                         <TextBlock Text="Repo cible" Style="{StaticResource FieldLabel}" />
-                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Target" IsChecked="{Binding CreateNew}">
+                        <RadioButton AutomationProperties.Name="Créer un nouveau repo" Style="{StaticResource ChoiceCard}" GroupName="Target" IsChecked="{Binding CreateNew}">
                             <StackPanel>
                                 <TextBlock Text="Créer un nouveau repo" FontWeight="SemiBold" />
                                 <DockPanel Margin="0,8,0,0" IsEnabled="{Binding CreateNew}">
@@ -78,16 +80,22 @@
                                         <RadioButton Content="Privé" GroupName="Visibility" IsChecked="{Binding IsPrivate}" Margin="0,0,12,0" VerticalAlignment="Center" />
                                         <RadioButton Content="Public" GroupName="Visibility" IsChecked="{Binding IsPrivate, Converter={StaticResource Not}}" VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Nom du nouveau repo" />
+                                    <controls:Field Error="{Binding NewNameError}" IsChecking="{Binding IsCheckingName}"
+                                                    Hint="Les espaces deviennent des tirets, comme sur GitHub.">
+                                        <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Nom du nouveau repo"
+                                                 controls:TextInput.SpacesToDash="True" />
+                                    </controls:Field>
                                 </DockPanel>
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource ChoiceCard}" GroupName="Target" IsChecked="{Binding CreateNew, Converter={StaticResource Not}}">
+                        <RadioButton AutomationProperties.Name="Choisir un repo existant" Style="{StaticResource ChoiceCard}" GroupName="Target" IsChecked="{Binding CreateNew, Converter={StaticResource Not}}">
                             <StackPanel>
                                 <TextBlock Text="Choisir un repo existant" FontWeight="SemiBold" />
                                 <TextBox Text="{Binding RepoFilter, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,6" AutomationProperties.Name="Filtrer les repos" />
+                                <controls:Field Error="{Binding RepositoryChoiceError}">
                                 <Grid>
-                                    <ListBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding SelectedRepository}" Height="150" BorderBrush="{DynamicResource Border}">
+                                    <ListBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding SelectedRepository}" Height="150" BorderBrush="{DynamicResource Border}"
+                                             AutomationProperties.Name="Repos existants">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal">
@@ -100,6 +108,7 @@
                                     <TextBlock Text="Chargement des repos…" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                Visibility="{Binding IsLoadingRepos, Converter={StaticResource BoolToVisibility}}" />
                                 </Grid>
+                                </controls:Field>
                             </StackPanel>
                         </RadioButton>
 
@@ -120,9 +129,13 @@
                             <StackPanel>
                                 <TextBlock Text="{Binding TargetSummary}" TextWrapping="Wrap" />
                                 <StackPanel Visibility="{Binding TargetDiverges, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
-                                    <CheckBox IsChecked="{Binding UseNewBranch}" Content="Envoyer ma branche actuelle sur une nouvelle branche :" />
-                                    <TextBox Text="{Binding NewBranchName, UpdateSourceTrigger=PropertyChanged}" Margin="22,6,0,0" IsEnabled="{Binding UseNewBranch}"
-                                             AutomationProperties.Name="Nom de la nouvelle branche" />
+                                    <controls:Field Error="{Binding DivergeError}">
+                                        <CheckBox IsChecked="{Binding UseNewBranch}" Content="Envoyer ma branche actuelle sur une nouvelle branche :" Margin="4" />
+                                    </controls:Field>
+                                    <controls:Field Error="{Binding NewBranchNameError}" Margin="22,6,0,0">
+                                        <TextBox Text="{Binding NewBranchName, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding UseNewBranch}"
+                                                 AutomationProperties.Name="Nom de la nouvelle branche" controls:TextInput.SpacesToDash="True" />
+                                    </controls:Field>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -157,7 +170,6 @@
                     <TextBlock Text="Aucun --force : un historique différent sur la cible n'est jamais écrasé. En cas d'échec, le projet retrouve son lien d'origine."
                                Style="{StaticResource Hint}" Margin="0,6,0,0" />
 
-                    <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="0,10,0,0" />
                 </StackPanel>
 
                 <!-- ===== Exécution ===== -->

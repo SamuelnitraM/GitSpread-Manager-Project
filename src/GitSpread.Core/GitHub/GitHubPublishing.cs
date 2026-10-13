@@ -35,11 +35,29 @@ public static partial class RepositoryName
         return name.Length == 0 ? "projet" : name;
     }
 
-    public static bool IsValid(string name) =>
-        name.Length is > 0 and <= MaxLength && !Invalid().IsMatch(name) && name is not ("." or "..");
+    public static bool IsValid(string name) => Validate(name) is null;
+
+    /// <summary>Remplace chaque espace par un tiret, comme le fait GitHub (« Mon projet » → « Mon-projet »).</summary>
+    public static string ReplaceSpaces(string name) => Whitespace().Replace(name, "-");
+
+    /// <summary>Message expliquant pourquoi le nom est refusé par GitHub, ou null s'il est valide.</summary>
+    public static string? Validate(string name)
+    {
+        if (name.Length == 0) return "Donne un nom au repo.";
+        if (name.Length > MaxLength) return $"Nom trop long : {MaxLength} caractères maximum ({name.Length} actuellement).";
+        if (name is "." or "..") return "« . » et « .. » ne sont pas des noms de repo valides.";
+        var invalid = Invalid().Matches(name).Select(m => m.Value).Distinct().ToList();
+        if (invalid.Count > 0)
+            return $"Caractère{(invalid.Count > 1 ? "s" : "")} non autorisé{(invalid.Count > 1 ? "s" : "")} : {string.Join(" ", invalid.Select(c => $"« {c} »"))}. "
+                 + "Utilise des lettres sans accent, des chiffres, « - », « _ » ou « . ».";
+        return null;
+    }
 
     [GeneratedRegex(@"[^A-Za-z0-9._-]")]
     private static partial Regex Invalid();
+
+    [GeneratedRegex(@"\s")]
+    private static partial Regex Whitespace();
 
     [GeneratedRegex(@"-{2,}")]
     private static partial Regex Collapse();

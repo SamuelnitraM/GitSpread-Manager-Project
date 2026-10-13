@@ -15,7 +15,7 @@ public enum SshKeyChoice { Skip, Existing, Generate }
 /// Les questions de « gh auth login », posées une par une. Les réponses sont ensuite traduites en options
 /// de gh auth login (mode non interactif), puis GitSpread enchaîne les étapes annexes lui-même.
 /// </summary>
-public sealed partial class LoginWizardViewModel : ObservableObject
+public sealed partial class LoginWizardViewModel : FormViewModel
 {
     private readonly AppServices _services;
     private readonly ILogger _logger;
@@ -55,7 +55,12 @@ public sealed partial class LoginWizardViewModel : ObservableObject
     public string NewKeyPassphrase { private get; set; } = "";
 
     [ObservableProperty] public partial bool UseBrowser { get; set; } = true;
-    public string Token { private get; set; } = "";
+    private string _token = "";
+    public string Token
+    {
+        private get => _token;
+        set { _token = value; if (TokenError is not null) ValidateStep(); }
+    }
 
     public string? PreviousActive { get; }
     public bool HasPreviousActive => PreviousActive is not null;
@@ -68,7 +73,18 @@ public sealed partial class LoginWizardViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanGoBack), nameof(IsQuestion), nameof(StepTitle))]
     public partial LoginStep Step { get; set; } = LoginStep.Host;
 
-    [ObservableProperty] public partial string? ValidationMessage { get; set; }
+    // Erreurs affichées sous les champs de l'étape en cours (null = valide)
+    [ObservableProperty] public partial string? HostError { get; set; }
+    [ObservableProperty] public partial string? SshKeyError { get; set; }
+    [ObservableProperty] public partial string? SshTitleError { get; set; }
+    [ObservableProperty] public partial string? TokenError { get; set; }
+
+    // Une fois une erreur affichée, elle se met à jour pendant la saisie.
+    partial void OnCustomHostChanged(string value) { if (HostError is not null) ValidateStep(); }
+    partial void OnUseGitHubComChanged(bool value) { if (HostError is not null) ValidateStep(); }
+    partial void OnSelectedSshKeyChanged(SshPublicKey? value) { if (SshKeyError is not null) ValidateStep(); }
+    partial void OnSshChoiceChanged(SshKeyChoice value) { if (SshKeyError is not null || SshTitleError is not null) ValidateStep(); }
+    partial void OnSshKeyTitleChanged(string value) { if (SshTitleError is not null) ValidateStep(); }
 
     public bool CanGoBack => _history.Count > 0 && IsQuestion;
     public bool IsQuestion => Step is not (LoginStep.Running or LoginStep.Done or LoginStep.Failed);
@@ -87,8 +103,11 @@ public sealed partial class LoginWizardViewModel : ObservableObject
     [RelayCommand]
     private void Next()
     {
-        ValidationMessage = Validate();
-        if (ValidationMessage is not null) return;
+        if (!ValidateStep())
+        {
+            RequestShowErrors();
+            return;
+        }
 
         var next = Step switch
         {
@@ -108,16 +127,27 @@ public sealed partial class LoginWizardViewModel : ObservableObject
     [RelayCommand]
     private void Back()
     {
-        ValidationMessage = null;
+        HostError = SshKeyError = SshTitleError = TokenError = null;
         if (_history.Count > 0) Step = _history.Pop();
     }
 
-    private string? Validate() => Step switch
+    /// <summary>Valide les champs de l'étape en cours. Vrai si l'on peut passer à la suivante.</summary>
+    private bool ValidateStep()
     {
-        LoginStep.Host when Host.Length == 0 || Host.Contains(' ') => "Indique le nom d'hôte de ton serveur GitHub Enterprise (ex. github.monentreprise.fr).",
-        LoginStep.SshKey when SshChoice == SshKeyChoice.Existing && SelectedSshKey is null => "Choisis une clé dans la liste.",
-        LoginStep.SshKey when SshChoice != SshKeyChoice.Skip && string.IsNullOrWhiteSpace(SshKeyTitle) => "Donne un titre à la clé (il apparaîtra sur GitHub).",
-        LoginStep.Token when string.IsNullOrWhiteSpace(Token) => "Colle ton token d'accès personnel.",
+        HostError = Step == LoginStep.Host && !UseGitHubCom ? ValidateHost(Host) : null;
+        SshKeyError = Step == LoginStep.SshKey && SshChoice == SshKeyChoice.Existing && SelectedSshKey is null ? "Choisis une clé dans la liste." : null;
+        SshTitleError = Step == LoginStep.SshKey && SshChoice != SshKeyChoice.Skip && string.IsNullOrWhiteSpace(SshKeyTitle)
+            ? "Donne un titre à la clé : c'est le nom qui apparaîtra dans les réglages SSH de GitHub." : null;
+        TokenError = Step == LoginStep.Token && string.IsNullOrWhiteSpace(Token) ? "Colle ton token d'accès personnel." : null;
+        return HostError is null && SshKeyError is null && SshTitleError is null && TokenError is null;
+    }
+
+    internal static string? ValidateHost(string host) => host switch
+    {
+        "" => "Indique le nom d'hôte de ton serveur GitHub Enterprise (ex. github.monentreprise.fr).",
+        _ when host.Any(char.IsWhiteSpace) => "Un nom d'hôte ne contient pas d'espace.",
+        _ when host.Contains('/') => "Indique seulement le nom d'hôte, sans chemin (ex. github.monentreprise.fr).",
+        _ when !host.Contains('.') => "Nom d'hôte incomplet : il manque le domaine (ex. github.monentreprise.fr).",
         _ => null,
     };
 

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GitSpread.Core.Accounts;
+using GitSpread.Core.Git;
 using GitSpread.Core.GitHub;
 using GitSpread.Core.Projects;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,7 @@ public enum RepointStep { Form, Running, Done, Failed }
 /// Étapes 4 et 5 : relier un projet à un autre repo (même compte ou autre compte), ou transférer le repo
 /// GitHub existant vers l'autre compte.
 /// </summary>
-public sealed partial class RepointViewModel : ObservableObject
+public sealed partial class RepointViewModel : FormViewModel
 {
     private readonly ProjectItemViewModel _project;
     private readonly IProjectHost _host;
@@ -23,12 +24,15 @@ public sealed partial class RepointViewModel : ObservableObject
     private readonly bool _ready;
     private List<GitHubRepository> _allRepos = [];
     private CancellationTokenSource? _analysisCts;
+    private Task _analysis = Task.CompletedTask;
+    private readonly RepositoryNameCheck _nameCheck;
 
     public RepointViewModel(ProjectItemViewModel project, IProjectHost host, GitHubAccount? targetAccount)
     {
         _project = project;
         _host = host;
         _logger = host.Services.LoggerFactory.CreateLogger<RepointViewModel>();
+        _nameCheck = new RepositoryNameCheck(host.Services.GitHub);
 
         Accounts = host.Accounts.Where(a => a.IsAuthenticated).ToList();
         SelectedAccount = Accounts.FirstOrDefault(a => a.Login == targetAccount?.Login && a.Host == targetAccount.Host)
@@ -36,8 +40,9 @@ public sealed partial class RepointViewModel : ObservableObject
                           ?? Accounts.FirstOrDefault();
         NewName = project.Remote?.Repository ?? RepositoryName.FromFolder(project.Name);
         CreateNew = true;
-        NewBranchName = $"import-{project.BranchLabel}".Replace(' ', '-');
+        NewBranchName = BranchName.ReplaceSpaces($"import-{project.BranchLabel}");
         _ready = true;
+        ValidateNewName();
         UpdatePreview();
     }
 
@@ -81,7 +86,13 @@ public sealed partial class RepointViewModel : ObservableObject
     [ObservableProperty] public partial string NewBranchName { get; set; }
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsForm))] public partial RepointStep Step { get; set; } = RepointStep.Form;
-    [ObservableProperty] public partial string? ValidationMessage { get; set; }
+    // Erreurs affichées sous les champs (null = champ valide)
+    [ObservableProperty] public partial string? AccountError { get; set; }
+    [ObservableProperty] public partial string? NewNameError { get; set; }
+    [ObservableProperty] public partial bool IsCheckingName { get; set; }
+    [ObservableProperty] public partial string? RepositoryChoiceError { get; set; }
+    [ObservableProperty] public partial string? DivergeError { get; set; }
+    [ObservableProperty] public partial string? NewBranchNameError { get; set; }
     [ObservableProperty] public partial string? ResultMessage { get; set; }
 
     public bool IsForm => Step == RepointStep.Form;
@@ -97,26 +108,62 @@ public sealed partial class RepointViewModel : ObservableObject
         OnPropertyChanged(nameof(CanNativeTransfer));
         OnPropertyChanged(nameof(Title));
         if (!CanNativeTransfer) Mode = RepointMode.Repoint;
+        AccountError = null;
         _ = LoadRepositoriesAsync();
+        ValidateNewName();
         UpdatePreview();
     }
     partial void OnModeChanged(RepointMode value) { if (_ready) UpdatePreview(); }
-    partial void OnCreateNewChanged(bool value) { if (!_ready) return; ResetTarget(); if (!value) _ = AnalyzeTargetAsync(); UpdatePreview(); }
-    partial void OnNewNameChanged(string value) { if (_ready) UpdatePreview(); }
+    partial void OnCreateNewChanged(bool value)
+    {
+        if (!_ready) return;
+        ResetTarget();
+        RepositoryChoiceError = null;
+        ValidateNewName();
+        if (!value) _analysis = AnalyzeTargetAsync();
+        UpdatePreview();
+    }
+    partial void OnNewNameChanged(string value) { if (!_ready) return; ValidateNewName(); UpdatePreview(); }
     partial void OnIsPrivateChanged(bool value) { if (_ready) UpdatePreview(); }
     partial void OnRepoFilterChanged(string value) => ApplyRepoFilter();
     partial void OnSelectedRepositoryChanged(GitHubRepository? value)
     {
         if (!_ready) return;
         if (value is not null && CreateNew) CreateNew = false;
+        if (value is not null) RepositoryChoiceError = null;
         ResetTarget();
-        _ = AnalyzeTargetAsync();
+        _analysis = AnalyzeTargetAsync();
         UpdatePreview();
     }
     partial void OnKeepOldLinkChanged(bool value) { if (_ready) UpdatePreview(); }
     partial void OnPushAllBranchesChanged(bool value) { if (_ready) UpdatePreview(); }
-    partial void OnUseNewBranchChanged(bool value) { if (_ready) UpdatePreview(); }
-    partial void OnNewBranchNameChanged(string value) { if (_ready) UpdatePreview(); }
+    partial void OnUseNewBranchChanged(bool value) { if (!_ready) return; if (value) DivergeError = null; ValidateNewBranchName(); UpdatePreview(); }
+    partial void OnNewBranchNameChanged(string value) { if (!_ready) return; ValidateNewBranchName(); UpdatePreview(); }
+
+    /// <summary>Nom du repo à créer : règles GitHub tout de suite, disponibilité sur le compte après une courte pause.</summary>
+    private void ValidateNewName(bool immediate = false)
+    {
+        if (!CreateNew || Mode == RepointMode.NativeTransfer)
+        {
+            NewNameError = null;
+            _nameCheck.Cancel();
+            return;
+        }
+        var name = NewName.Trim();
+        var error = RepositoryName.Validate(name);
+        if (name.Length == 0 && !Submitted) error = null;
+        NewNameError = error;
+        if (error is null && name.Length > 0 && SelectedAccount is { } account)
+            _nameCheck.Schedule(account, name, immediate, checking => IsCheckingName = checking, taken =>
+            {
+                if (CreateNew && NewName.Trim() == name) NewNameError = taken;
+            });
+        else
+            _nameCheck.Cancel();
+    }
+
+    private void ValidateNewBranchName() =>
+        NewBranchNameError = TargetDiverges && UseNewBranch ? BranchName.Validate(NewBranchName.Trim()) : null;
     partial void OnTargetSummaryChanged(string? value) => OnPropertyChanged(nameof(HasTargetSummary));
 
     public Task LoadAsync() => LoadRepositoriesAsync();
@@ -138,7 +185,7 @@ public sealed partial class RepointViewModel : ObservableObject
             _logger.LogWarning(e, "Repos de {Login} indisponibles", account.Login);
             _allRepos = [];
             ApplyRepoFilter();
-            ValidationMessage = $"Impossible de lister les repos de {account.Login} : {e.Message}";
+            RepositoryChoiceError = $"Impossible de lister les repos de {account.Login} : {e.Message}";
         }
         finally { IsLoadingRepos = false; }
     }
@@ -157,6 +204,8 @@ public sealed partial class RepointViewModel : ObservableObject
         TargetSummary = null;
         TargetDiverges = false;
         UseNewBranch = false;
+        DivergeError = null;
+        NewBranchNameError = null;
     }
 
     private async Task AnalyzeTargetAsync()
@@ -211,8 +260,11 @@ public sealed partial class RepointViewModel : ObservableObject
     [RelayCommand]
     private async Task RunAsync()
     {
-        ValidationMessage = Validate();
-        if (ValidationMessage is not null) return;
+        if (!await ValidateAllAsync())
+        {
+            RequestShowErrors();
+            return;
+        }
         if (Mode == RepointMode.NativeTransfer && !_host.Dialogs.Confirm(
                 $"Transférer {_project.Remote!.FullName} vers {SelectedAccount!.Login} ?\n\nLe repo (issues, étoiles, historique) changera de propriétaire. "
                 + $"{SelectedAccount.Login} devra accepter la demande reçue par e-mail.", "Transfert GitHub"))
@@ -240,16 +292,23 @@ public sealed partial class RepointViewModel : ObservableObject
         }
     }
 
-    private string? Validate()
+    /// <summary>Valide chaque champ (erreurs affichées sous les champs concernés). Vrai si tout est bon.</summary>
+    private async Task<bool> ValidateAllAsync()
     {
-        if (SelectedAccount is null) return "Choisis un compte.";
-        if (Mode == RepointMode.NativeTransfer) return null;
-        if (CreateNew && !RepositoryName.IsValid(NewName.Trim())) return "Nom de repo invalide : lettres, chiffres, « - », « _ » et « . » uniquement.";
-        if (!CreateNew && SelectedRepository is null) return "Choisis un repo dans la liste, ou « Créer un nouveau repo ».";
-        if (IsAnalyzingTarget) return "Vérification du repo cible en cours, un instant…";
-        if (TargetDiverges && !UseNewBranch) return "Le repo cible a un historique différent : coche « Envoyer sur une nouvelle branche » ou choisis un autre repo.";
-        if (TargetDiverges && UseNewBranch && string.IsNullOrWhiteSpace(NewBranchName)) return "Donne un nom à la nouvelle branche.";
-        return null;
+        Submitted = true;
+        AccountError = SelectedAccount is null ? "Choisis le compte GitHub cible." : null;
+        if (Mode == RepointMode.NativeTransfer) return AccountError is null;
+
+        ValidateNewName(immediate: true);
+        await _nameCheck.Pending;
+        await _analysis; // le repo cible est peut-être encore en cours d'examen
+
+        RepositoryChoiceError = !CreateNew && SelectedRepository is null ? "Choisis un repo dans la liste, ou « Créer un nouveau repo »." : null;
+        DivergeError = TargetDiverges && !UseNewBranch
+            ? "Ce repo a un historique différent : coche « Envoyer ma branche actuelle sur une nouvelle branche », ou choisis un autre repo."
+            : null;
+        ValidateNewBranchName();
+        return AccountError is null && NewNameError is null && RepositoryChoiceError is null && DivergeError is null && NewBranchNameError is null;
     }
 
     [RelayCommand] private void BackToForm() => Step = RepointStep.Form;

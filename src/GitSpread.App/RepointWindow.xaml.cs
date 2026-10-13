@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Threading;
 using GitSpread.App.ViewModels;
 
 namespace GitSpread.App;
@@ -14,6 +15,7 @@ public partial class RepointWindow : Window
         DataContext = _vm = vm;
         Title = vm.Title;
         vm.CloseRequested += (_, _) => Close();
+        vm.ShowErrorsRequested += (_, _) => Dispatcher.BeginInvoke(() => Controls.Field.FocusFirstError(this), DispatcherPriority.Loaded);
         Loaded += async (_, _) => await vm.LoadAsync();
     }
 

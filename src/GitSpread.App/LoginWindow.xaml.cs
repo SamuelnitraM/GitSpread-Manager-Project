@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Threading;
 using GitSpread.App.ViewModels;
 
 namespace GitSpread.App;
@@ -13,6 +14,7 @@ public partial class LoginWindow : Window
         InitializeComponent();
         DataContext = _vm = vm;
         vm.CloseRequested += (_, _) => Close();
+        vm.ShowErrorsRequested += (_, _) => Dispatcher.BeginInvoke(() => Controls.Field.FocusFirstError(this), DispatcherPriority.Loaded);
     }
 
     // Les PasswordBox ne se lient pas : le secret ne transite que par ces deux setters.

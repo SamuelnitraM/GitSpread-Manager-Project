@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+        xmlns:controls="clr-namespace:GitSpread.App.Controls"
         mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:PublishViewModel}"
         Title="Publier sur GitHub" Width="680" Height="760" MinWidth="560" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip"
@@ -53,12 +54,15 @@
                         <TextBlock Text="Aucun compte GitHub connecté : ajoute-en un avec le bouton « + » à côté des onglets." TextWrapping="Wrap" Foreground="{DynamicResource Warning}" />
                     </Border>
 
-                    <TextBlock Text="Compte GitHub" Style="{StaticResource FieldLabel}" />
-                    <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" DisplayMemberPath="Login" Padding="6,4" />
+                    <controls:Field Label="Compte GitHub" Error="{Binding AccountError}" Margin="0,14,0,0">
+                        <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" DisplayMemberPath="Login" Padding="6,4" />
+                    </controls:Field>
 
-                    <TextBlock Text="Nom du repo" Style="{StaticResource FieldLabel}" />
-                    <TextBox Text="{Binding RepositoryName, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" BorderBrush="{DynamicResource Border}" />
-                    <TextBlock Text="Lettres, chiffres, « - », « _ » et « . » uniquement." Style="{StaticResource Hint}" />
+                    <controls:Field Label="Nom du repo" Error="{Binding RepositoryNameError}" IsChecking="{Binding IsCheckingName}" Margin="0,14,0,0"
+                                    Hint="Les espaces deviennent des tirets, comme sur GitHub. Lettres sans accent, chiffres, « - », « _ » et « . ».">
+                        <TextBox Text="{Binding RepositoryName, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" BorderBrush="{DynamicResource Border}"
+                                 controls:TextInput.SpacesToDash="True" />
+                    </controls:Field>
 
                     <TextBlock Text="Visibilité" Style="{StaticResource FieldLabel}" />
                     <UniformGrid Columns="2">
@@ -124,7 +128,6 @@
                         </ItemsControl>
                     </Border>
 
-                    <TextBlock Text="{Binding ValidationMessage}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap" Margin="0,10,0,0" />
                 </StackPanel>
 
                 <!-- ================= En cours / résultat ================= -->
