@@ -230,7 +230,7 @@ public sealed partial class ProjectItemViewModel
         await RunAsync(dialog.Title, async () =>
         {
             var result = await host.Services.Integrator.IntegrateAsync(Path, analysis, options,
-                () => host.Services.Credentials.EnvironmentForAsync(Placement.Account, Remote));
+                () => host.Services.Credentials.EnvironmentForAsync(Placement.NetworkAccount, Remote));
             return new ActionLog(dialog.Title, result.Succeeded || result.ConflictsToResolve, result.Message,
                 string.Join("\n", result.Steps.Select(s => s.Command)),
                 string.Join("\n", result.Steps.Select(s => s.Output).Where(o => o.Length > 0)));
@@ -242,9 +242,38 @@ public sealed partial class ProjectItemViewModel
     [RelayCommand]
     private Task ChangeLinkedRepo() => ChangeLinkedRepositoryAsync(null);
 
-    /// <summary>Ouvre l'assistant de repointage, éventuellement vers un compte précis (projet déposé sur son onglet).</summary>
+    /// <summary>
+    /// Ouvre l'assistant de repointage, éventuellement vers un compte précis (projet déposé sur son onglet).
+    /// Un projet sans remote (ou pas encore suivi par git) n'a rien à repointer : on propose de le publier sur ce compte.
+    /// Déposé sur l'onglet d'un autre compte, un projet lié peut aussi simplement être partagé avec ce compte (F3A).
+    /// </summary>
     public async Task ChangeLinkedRepositoryAsync(GitHubAccount? targetAccount)
     {
+        if (!HasRemote)
+        {
+            await PublishToAsync(targetAccount);
+            return;
+        }
+
+        if (targetAccount is not null && Placement.Account is { } owner && !owner.Is(targetAccount)
+            && owner.Host.Equals(targetAccount.Host, StringComparison.OrdinalIgnoreCase)
+            && Remote is { IsGitHub: true, FullName: { } fullName } && !Placement.IsCollaborator(targetAccount))
+        {
+            var choice = host.Dialogs.Choose($"« {Name} » et {targetAccount.Login}",
+                $"Que faire de « {Name} » avec le compte {targetAccount.Login} ?",
+                [
+                    $"Donner accès à {targetAccount.Login} (collaborateur) : le repo reste chez {owner.Login}, les deux comptes peuvent envoyer",
+                    $"Relier le projet à un repo de {targetAccount.Login} (nouveau repo ou transfert)…",
+                ]);
+            if (choice < 0) return;
+            if (choice == 0)
+            {
+                await RunAsync("Ajouter un collaborateur", () => Collaboration.AddAsync(host, owner, fullName, targetAccount.Login));
+                await host.ReloadCollaborationsAsync();
+                return;
+            }
+        }
+
         var dialog = new RepointViewModel(this, host, targetAccount);
         host.Dialogs.ShowRepoint(dialog);
         if (dialog.Done) await host.RescanAsync(Path);

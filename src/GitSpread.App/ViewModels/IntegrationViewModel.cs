@@ -56,7 +56,7 @@ public sealed partial class IntegrationViewModel(ProjectItemViewModel project, I
         {
             try
             {
-                var auth = await host.Services.Credentials.EnvironmentForAsync(project.Placement.Account, project.Remote);
+                var auth = await host.Services.Credentials.EnvironmentForAsync(project.Placement.NetworkAccount, project.Remote);
                 var fetch = await host.Services.Git.FetchAsync(project.Path, project.Project.RemoteName ?? "origin", auth);
                 if (!fetch.Succeeded) FetchNote = $"Impossible de vérifier GitHub ({fetch.Explanation ?? "hors ligne ?"}) : analyse faite avec les infos déjà connues.";
             }

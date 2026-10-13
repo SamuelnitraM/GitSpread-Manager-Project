@@ -5,7 +5,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
              mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:AccountTabViewModel}">
-    <DockPanel>
+    <Grid>
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MinWidth="300" />
+        <ColumnDefinition Width="380" />
+    </Grid.ColumnDefinitions>
+    <DockPanel Grid.Column="0">
         <DockPanel DockPanel.Dock="Top" Margin="16,12,16,10">
             <CheckBox DockPanel.Dock="Right" Content="Afficher les archivés" VerticalAlignment="Center" IsChecked="{Binding ShowArchived}" Margin="16,0,0,0" />
             <TextBlock DockPanel.Dock="Right" Text="{Binding RepositoriesSummary}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="16,0,0,0" />
@@ -28,13 +33,46 @@
             </Grid>
         </DockPanel>
 
+        <!-- Invitations à collaborer reçues par ce compte (F3A) -->
+        <Border DockPanel.Dock="Top" Margin="16,0,16,10" Background="{DynamicResource AccentSoft}" CornerRadius="6" Padding="12,8"
+                Visibility="{Binding HasReceivedInvitations, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE715;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Accent}" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding ReceivedInvitationsLabel}" FontWeight="SemiBold" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding ReceivedInvitations}" Margin="0,4,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,4,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Refuser…" Margin="6,0,0,0"
+                                        Command="{Binding DataContext.DeclineInvitationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding FullName, StringFormat=Refuser {0}}" />
+                                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Accepter" Margin="6,0,0,0"
+                                        Command="{Binding DataContext.AcceptInvitationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding FullName, StringFormat=Accepter {0}}" />
+                                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding FullName, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <Run Text="· invité par" Foreground="{DynamicResource Muted}" /> <Run Text="{Binding Inviter, Mode=OneWay}" Foreground="{DynamicResource Muted}" />
+                                </TextBlock>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+        <Border DockPanel.Dock="Top" Margin="16,0,16,10" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Border}" BorderThickness="1"
+                CornerRadius="6" Padding="12,8" Visibility="{Binding HasInvitationMessage, Converter={StaticResource BoolToVisibility}}">
+            <TextBox Text="{Binding InvitationMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+        </Border>
+
         <Border DockPanel.Dock="Top" Margin="16,0,16,10" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="12,8"
                 Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
             <TextBox Text="{Binding Error, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
         </Border>
 
         <Grid>
-            <ListView ItemsSource="{Binding Repositories}" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource Border}"
+            <ListView ItemsSource="{Binding Repositories}" SelectedItem="{Binding SelectedRepository}" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource Border}"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
                       MouseDoubleClick="Repository_DoubleClick">
                 <ListView.ItemContainerStyle>
@@ -67,6 +105,14 @@
                                         <TextBlock Text="{Binding VisibilityLabel}" FontSize="11" Foreground="{DynamicResource Muted}" />
                                     </Border>
                                     <Border Style="{StaticResource Pill}" Background="{DynamicResource AccentSoft}"
+                                            Visibility="{Binding IsCollaboration, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Ce compte n'en est pas propriétaire : il y a accès en collaborateur">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE716;" Style="{StaticResource Glyph}" FontSize="10" Foreground="{DynamicResource Accent}" Margin="0,0,4,0" />
+                                            <TextBlock Text="{Binding OwnerLabel}" FontSize="11" Foreground="{DynamicResource Accent}" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource Pill}" Background="{DynamicResource AccentSoft}"
                                             Visibility="{Binding IsFork, Converter={StaticResource BoolToVisibility}}">
                                         <TextBlock Text="fork" FontSize="11" Foreground="{DynamicResource Accent}" />
                                     </Border>
@@ -89,4 +135,180 @@
                        Visibility="{Binding IsLoadingRepositories, Converter={StaticResource BoolToVisibility}}" />
         </Grid>
     </DockPanel>
+
+    <!-- ============ Panneau du repo sélectionné (F4) ============ -->
+    <Border Grid.Column="1" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Border}" BorderThickness="1,0,0,0">
+        <Grid>
+            <TextBlock Text="Sélectionne un repo pour le gérer." Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{Binding HasRepositoryPanel, Converter={StaticResource InverseBoolToVisibility}}" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto" DataContext="{Binding RepositoryPanel}"
+                          Visibility="{Binding DataContext.HasRepositoryPanel, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Margin="20,16" d:DataContext="{d:DesignInstance vm:GitHubRepositoryViewModel}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Command="{Binding OpenOnGitHubCommand}" AutomationProperties.Name="Voir sur GitHub"
+                                ToolTip="Ouvrir sur GitHub" VerticalAlignment="Top">
+                            <TextBlock Text="&#xE8A7;" Style="{StaticResource Glyph}" />
+                        </Button>
+                        <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <TextBox Text="{Binding FullName, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Muted}" />
+
+                    <TextBlock Text="Lecture des informations…" Foreground="{DynamicResource Muted}" Margin="0,12,0,0"
+                               Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+                    <Border Margin="0,12,0,0" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="10,6"
+                            Visibility="{Binding HasLoadError, Converter={StaticResource BoolToVisibility}}">
+                        <TextBox Text="{Binding LoadError, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
+                    </Border>
+
+                    <StackPanel Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
+                        <WrapPanel Margin="-6,8,0,0">
+                            <Border Style="{StaticResource Pill}" BorderThickness="1" BorderBrush="{DynamicResource Border}">
+                                <TextBlock Text="{Binding VisibilityLabel}" FontSize="11" Foreground="{DynamicResource Muted}" />
+                            </Border>
+                            <Border Style="{StaticResource Pill}" Background="{DynamicResource WarningSoft}" Visibility="{Binding IsArchived, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="archivé · lecture seule" FontSize="11" Foreground="{DynamicResource Warning}" />
+                            </Border>
+                            <Border Style="{StaticResource Pill}" Background="{DynamicResource AccentSoft}" Visibility="{Binding IsFork, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="fork" FontSize="11" Foreground="{DynamicResource Accent}" />
+                            </Border>
+                        </WrapPanel>
+                        <Border Margin="0,10,0,0" Background="{DynamicResource AccentSoft}" CornerRadius="6" Padding="10,6"
+                                Visibility="{Binding IsViewerCollaborator, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding OwnerLabel}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Text="{Binding Details.Description}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Margin="0,4,0,0" Visibility="{Binding HasHomepage, Converter={StaticResource BoolToVisibility}}">
+                            <Hyperlink NavigateUri="{Binding Details.Homepage}" RequestNavigate="Homepage_RequestNavigate"><Run Text="{Binding Details.Homepage, Mode=OneWay}" /></Hyperlink>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding Topics}" Margin="-6,8,0,0" Visibility="{Binding HasTopics, Converter={StaticResource BoolToVisibility}}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Pill}" Background="{DynamicResource AccentSoft}" Margin="6,0,0,4">
+                                        <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource Accent}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding FactsLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                        <TextBlock Text="SUR CE POSTE" Style="{StaticResource SectionLabel}" />
+                        <TextBlock Text="{Binding LinkedLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding LinkedProjects}" Margin="0,2,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding Path, Mode=OneWay}" Style="{StaticResource SelectableText}" FontSize="12" Margin="0,2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <WrapPanel Margin="0,8,0,0" IsEnabled="{Binding CanAct}">
+                            <Button Style="{StaticResource PrimaryButton}" Command="{Binding CloneCommand}" Margin="0,0,8,8" AutomationProperties.Name="Cloner en local">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Cloner en local…" /></StackPanel>
+                            </Button>
+                        </WrapPanel>
+
+                        <!-- Collaborateurs (F3A) -->
+                        <TextBlock Text="COLLABORATEURS" Style="{StaticResource SectionLabel}" />
+                        <TextBlock Text="{Binding CollaboratorsLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding Collaborators}" Margin="0,2,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:CollaboratorRow}">
+                                    <DockPanel Margin="0,4,0,0">
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="{Binding ActionLabel}" VerticalAlignment="Center"
+                                                Command="{Binding DataContext.RemoveCollaboratorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                AutomationProperties.Name="{Binding Login, StringFormat=Retirer {0}}"
+                                                IsEnabled="{Binding DataContext.CanManageCollaborators, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                Visibility="{Binding DataContext.CanManageCollaborators, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="&#xE77B;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Login}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Margin="0,6,0,0" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="10,6"
+                                Visibility="{Binding HasCollaboratorsError, Converter={StaticResource BoolToVisibility}}">
+                            <TextBox Text="{Binding CollaboratorsError, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
+                        </Border>
+                        <WrapPanel Margin="0,8,0,0">
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding InviteCollaboratorCommand}" Margin="0,0,8,8"
+                                    IsEnabled="{Binding CanManageCollaborators}" AutomationProperties.Name="Ajouter un collaborateur"
+                                    Visibility="{Binding IsViewerCollaborator, Converter={StaticResource InverseBoolToVisibility}}"
+                                    ToolTip="Donner à un autre compte le droit d'envoyer des commits sur ce repo (il reste chez son propriétaire)">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8FA;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Ajouter un collaborateur…" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding LeaveCommand}" Margin="0,0,8,8"
+                                    IsEnabled="{Binding CanLeave}" AutomationProperties.Name="Quitter ce repo"
+                                    Visibility="{Binding IsViewerCollaborator, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Renoncer à l'accès de collaborateur de ce compte (les fichiers locaux ne sont pas touchés)">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE89B;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Quitter ce repo…" /></StackPanel>
+                            </Button>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding CollaboratorsNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
+
+                        <TextBlock Text="GÉRER SUR GITHUB" Style="{StaticResource SectionLabel}" />
+                        <TextBlock Text="Seul un administrateur du repo peut le renommer, changer sa visibilité, l'archiver, le transférer ou le supprimer."
+                                   Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"
+                                   Visibility="{Binding ShowAdminNote, Converter={StaticResource BoolToVisibility}}" />
+                        <WrapPanel>
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding EditCommand}" Content="Modifier…" Margin="0,0,8,8" IsEnabled="{Binding CanAct}"
+                                    ToolTip="Description, site web et sujets" />
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding RenameCommand}" Content="Renommer…" Margin="0,0,8,8" IsEnabled="{Binding CanAdminister}" />
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding RenameDefaultBranchCommand}" Content="Renommer la branche principale…" Margin="0,0,8,8"
+                                    IsEnabled="{Binding CanAdminister}" ToolTip="Ex. master → main, sur GitHub et dans les projets locaux liés" />
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleVisibilityCommand}" Content="{Binding ToggleVisibilityLabel}" Margin="0,0,8,8"
+                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="{Binding ToggleVisibilityLabel}" />
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleArchiveCommand}" Content="{Binding ToggleArchiveLabel}" Margin="0,0,8,8"
+                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="{Binding ToggleArchiveLabel}" />
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding TransferCommand}" Content="Transférer à un autre compte…" Margin="0,0,8,8"
+                                    IsEnabled="{Binding CanAdminister}" />
+                        </WrapPanel>
+                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding DeleteCommand}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="Supprimer le repo"
+                                ToolTip="Suppression définitive sur GitHub (les fichiers locaux ne sont jamais touchés)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE74D;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Danger}" Margin="0,0,6,0" />
+                                <TextBlock Text="Supprimer le repo…" Foreground="{DynamicResource Danger}" />
+                            </StackPanel>
+                        </Button>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+                            <ProgressBar IsIndeterminate="True" Width="60" Height="3" BorderThickness="0" Foreground="{DynamicResource Accent}" Background="Transparent" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding BusyLabel}" Foreground="{DynamicResource Muted}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Compte rendu de la dernière action -->
+                    <Border Margin="0,12,0,0" CornerRadius="8" Padding="12,10" BorderThickness="1"
+                            Visibility="{Binding HasLastAction, Converter={StaticResource BoolToVisibility}}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource DangerSoft}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource DangerBorder}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding LastAction.Succeeded}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessBorder}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding LastAction.Icon}" Style="{StaticResource Glyph}" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding LastAction.Title}" FontWeight="SemiBold" />
+                            </StackPanel>
+                            <TextBox Text="{Binding LastAction.Message, Mode=OneWay}" Style="{StaticResource SelectableText}" Margin="0,4,0,0" />
+                            <TextBox Text="{Binding LastAction.Commands, Mode=OneWay}" Style="{StaticResource SelectableText}" FontFamily="Consolas" FontSize="12"
+                                     Foreground="{DynamicResource Muted}" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+    </Grid>
 </UserControl>

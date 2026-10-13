@@ -20,7 +20,7 @@ public sealed record GitHubRepository(
 }
 
 /// <summary>Opérations côté GitHub, toujours exécutées avec le token du compte concerné.</summary>
-public sealed class GitHubService(GhCli gh, AccountService accounts)
+public sealed partial class GitHubService(GhCli gh, AccountService accounts)
 {
     public const int DefaultLimit = 200;
 

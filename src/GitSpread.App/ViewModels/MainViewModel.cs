@@ -23,6 +23,7 @@ public sealed record AppServices(
     ProjectPublisher Publisher,
     BranchIntegrator Integrator,
     TransferService Transfer,
+    LinkedProjects Linked,
     SshKeyService SshKeys,
     ProjectScanner Scanner,
     SettingsStore SettingsStore,
@@ -49,6 +50,18 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
     public AppServices Services => _services;
     public IDialogService Dialogs { get; }
     public IReadOnlyList<GitHubAccount> Accounts => _accounts;
+    public IReadOnlyList<LocalProject> LocalProjects => _projects;
+
+    /// <summary>Recharge la liste des repos GitHub d'un compte (après un renommage, une suppression…).</summary>
+    public Task ReloadRepositoriesAsync(GitHubAccount account) =>
+        AccountTabs.FirstOrDefault(t => t.Login == account.Login && t.Account.Host == account.Host)?.LoadRepositoriesAsync() ?? Task.CompletedTask;
+
+    public async Task ReloadCollaborationsAsync()
+    {
+        await Task.WhenAll(AccountTabs.Select(t => t.LoadRepositoriesAsync()));
+        DistributeProjects();
+    }
+
     public void SaveSettings() => _services.SettingsStore.Save(Settings);
 
     private readonly Dictionary<string, Task<GitHubUser?>> _users = new(StringComparer.OrdinalIgnoreCase);
@@ -103,6 +116,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
             }
 
             await Task.WhenAll(AccountTabs.Select(t => t.LoadRepositoriesAsync()).Append(ScanAsync()));
+            DistributeProjects(); // les collaborations arrivent avec les repos, parfois après l'analyse des dossiers
         }
         catch (ToolNotFoundException e)
         {
@@ -234,7 +248,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         foreach (var account in _accounts)
         {
             if (existing.TryGetValue((account.Login, account.Host), out var tab)) tab.Account = account;
-            else tab = new AccountTabViewModel(account, _services.GitHub, _logger);
+            else tab = new AccountTabViewModel(account, this, _logger);
             Tabs.Add(tab);
         }
         Tabs.Add(_unlinked);
@@ -337,15 +351,20 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         // Le compte rendu de la dernière action survit à la nouvelle analyse (ex. « Initialiser git » change l'état du projet).
         var previousLogs = Tabs.SelectMany(t => t.Projects).Where(p => p.LastAction is not null)
             .GroupBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().LastAction, StringComparer.OrdinalIgnoreCase);
-        ProjectItemViewModel Item(ProjectPlacement p) =>
-            new(p, this) { LastAction = previousLogs.GetValueOrDefault(p.Project.Path) };
+        ProjectItemViewModel Item(ProjectPlacement p, GitHubAccount? viewer) =>
+            new(p, this) { ViewingAccount = viewer, LastAction = previousLogs.GetValueOrDefault(p.Project.Path) };
 
-        var placements = ProjectClassifier.Classify(_projects, _accounts);
+        // Un projet partagé apparaît chez son propriétaire et chez chaque collaborateur connecté (F3A).
+        var collaborations = new CollaborationIndex();
+        foreach (var tab in AccountTabs)
+            foreach (var repo in tab.Collaborations) collaborations.Add(tab.Account, repo.FullName);
+
+        var placements = ProjectClassifier.Classify(_projects, _accounts, collaborations);
         foreach (var tab in AccountTabs)
             tab.SetProjects(placements
-                .Where(p => p.Account is { } a && a.Login == tab.Login && a.Host == tab.Account.Host)
-                .Select(Item));
-        _unlinked.SetProjects(placements.Where(p => p.Account is null).Select(Item));
+                .Where(p => tab.Account.Is(p.Account) || p.IsCollaborator(tab.Account))
+                .Select(p => Item(p, tab.Account)));
+        _unlinked.SetProjects(placements.Where(p => p.Reason is not null).Select(p => Item(p, null)));
     }
 
     private void UpdateStatus()

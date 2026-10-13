@@ -21,7 +21,7 @@ public sealed partial class PublishViewModel : FormViewModel
     private readonly ILogger _logger;
     private readonly RepositoryNameCheck _nameCheck;
 
-    public PublishViewModel(ProjectItemViewModel project, IProjectHost host)
+    public PublishViewModel(ProjectItemViewModel project, IProjectHost host, GitHubAccount? targetAccount = null)
     {
         _project = project;
         _host = host;
@@ -30,7 +30,8 @@ public sealed partial class PublishViewModel : FormViewModel
         Identity = new IdentityViewModel(project.Path, host);
 
         Accounts = host.Accounts.Where(a => a.IsAuthenticated).ToList();
-        SelectedAccount = project.Placement.Account
+        SelectedAccount = Accounts.FirstOrDefault(a => a.Login == targetAccount?.Login && a.Host == targetAccount.Host)
+                          ?? project.Placement.Account
                           ?? Accounts.FirstOrDefault(a => a.IsActive)
                           ?? Accounts.FirstOrDefault();
         RepositoryName = Core.GitHub.RepositoryName.FromFolder(project.Name);

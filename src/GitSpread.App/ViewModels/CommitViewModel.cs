@@ -95,7 +95,7 @@ public sealed partial class CommitViewModel : ObservableObject
     public async Task LoadAsync()
     {
         await LoadChangesAsync();
-        await Identity.LoadAsync(_project.Placement.Account);
+        await Identity.LoadAsync(_project.Placement.NetworkAccount);
     }
 
     private async Task LoadChangesAsync()
@@ -115,7 +115,7 @@ public sealed partial class CommitViewModel : ObservableObject
     [RelayCommand]
     private async Task AddGitignoreAsync()
     {
-        var account = _project.Placement.Account ?? _host.Accounts.FirstOrDefault(a => a.IsAuthenticated);
+        var account = _project.Placement.NetworkAccount ?? _host.Accounts.FirstOrDefault(a => a.IsAuthenticated);
         if (GitignoreSuggestion is not { } template) return;
         if (account is null)
         {

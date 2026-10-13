@@ -34,6 +34,7 @@ public sealed class TestHost : IProjectHost, IDialogService
         var dir = Directory.CreateTempSubdirectory("GitSpread app tests ").FullName;
         Services = new AppServices(accountService, gitHub, new LoginService(gh, accountService), git, credentials,
             new ProjectPublisher(git, gitHub, credentials), new BranchIntegrator(git), new TransferService(git, gitHub, credentials),
+            new LinkedProjects(git, credentials),
             new SshKeyService(runner, Path.Combine(dir, ".ssh")), new ProjectScanner(),
             new SettingsStore(Path.Combine(dir, "settings.json")), NullLoggerFactory.Instance, dir);
         Accounts = accounts.Length > 0 ? accounts : [Pro, Perso];
@@ -57,6 +58,12 @@ public sealed class TestHost : IProjectHost, IDialogService
 
     public Task<bool> EnsureScopeAsync(GitHubAccount account, string scope, string reason) => Task.FromResult(account.HasScope(scope));
     public void ShowScopes(AccountScopesViewModel viewModel) { }
+    public void ShowClone(CloneViewModel viewModel) { }
+    public void ShowEditRepository(EditRepositoryViewModel viewModel) { }
+    public IReadOnlyList<LocalProject> LocalProjects { get; set; } = [];
+    public Task ReloadRepositoriesAsync(GitHubAccount account) => Task.CompletedTask;
+    public int CollaborationReloads { get; private set; }
+    public Task ReloadCollaborationsAsync() { CollaborationReloads++; return Task.CompletedTask; }
     public Task RescanAsync(string? revealPath = null) => Task.CompletedTask;
     public Task RemoveExtraProjectAsync(string path) => Task.CompletedTask;
 
@@ -76,12 +83,25 @@ public sealed class TestHost : IProjectHost, IDialogService
         }
     }
 
-    // IDialogService : non utilisé par ces tests
+    /// <summary>Assistants ouverts (publication, repointage), dans l'ordre.</summary>
+    public List<object> Shown { get; } = [];
+
     public bool ShowCommit(CommitViewModel viewModel) => false;
-    public void ShowPublish(PublishViewModel viewModel) { }
+    public void ShowPublish(PublishViewModel viewModel) => Shown.Add(viewModel);
     public bool ShowIntegration(IntegrationViewModel viewModel) => false;
-    public void ShowRepoint(RepointViewModel viewModel) { }
+    public void ShowRepoint(RepointViewModel viewModel) => Shown.Add(viewModel);
     public bool Confirm(string message, string title, bool destructive = false) => true;
-    public int Choose(string title, string message, IReadOnlyList<string> options) => -1;
-    public string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false) => null;
+    /// <summary>Réponses données aux saisies successives (null = annuler). La validation de la fenêtre est appliquée.</summary>
+    public Queue<string?> PromptAnswers { get; } = new();
+    public List<string> PromptErrors { get; } = [];
+    public int ChooseAnswer { get; set; } = -1;
+
+    public int Choose(string title, string message, IReadOnlyList<string> options) => ChooseAnswer;
+
+    public string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false)
+    {
+        if (!PromptAnswers.TryDequeue(out var answer) || answer is null) return null;
+        if (validate?.Invoke(answer) is { } error) { PromptErrors.Add(error); return null; } // la fenêtre resterait ouverte
+        return answer;
+    }
 }

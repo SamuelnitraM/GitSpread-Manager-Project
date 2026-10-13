@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GitSpread.Core.Accounts;
 using GitSpread.Core.Git;
 using GitSpread.Core.Projects;
 
@@ -67,9 +68,10 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     public bool IsLocalRepository => IsRepository && !HasRemote;
 
     /// <summary>Compte utilisé pour les échanges avec GitHub, dit en clair.</summary>
-    public string NetworkAccountLabel => (Placement.Account, Remote?.Protocol) switch
+    public string NetworkAccountLabel => (Placement.NetworkAccount, Remote?.Protocol) switch
     {
         (_, RemoteProtocol.Ssh) => "Échanges via SSH, avec tes clés SSH.",
+        ({ } account, _) when Placement.IsCollaborator(account) => $"Échanges avec GitHub en tant que {account.Login} (collaborateur).",
         ({ } account, _) => $"Échanges avec GitHub en tant que {account.Login}.",
         _ => "Aucun compte connecté ne correspond : git utilisera ta configuration habituelle.",
     };
@@ -222,9 +224,12 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     }
 
     [RelayCommand]
-    private async Task PublishAsync()
+    private Task PublishAsync() => PublishToAsync(null);
+
+    /// <summary>Ouvre l'assistant de publication, éventuellement sur un compte précis (projet déposé sur son onglet).</summary>
+    public async Task PublishToAsync(GitHubAccount? targetAccount)
     {
-        var dialog = new PublishViewModel(this, host);
+        var dialog = new PublishViewModel(this, host, targetAccount);
         host.Dialogs.ShowPublish(dialog);
         if (dialog.Published) await host.RescanAsync(Path);
     }
@@ -243,7 +248,7 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
 
     private Task RunNetworkAsync(string title, Func<IReadOnlyDictionary<string, string>, Task<ActionLog>> action) =>
         RunAsync(title, async () =>
-            await action(await host.Services.Credentials.EnvironmentForAsync(Placement.Account, Remote)));
+            await action(await host.Services.Credentials.EnvironmentForAsync(Placement.NetworkAccount, Remote)));
 
     private async Task RunAsync(string title, Func<Task<ActionLog>> action)
     {

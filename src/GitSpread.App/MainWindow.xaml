@@ -86,10 +86,10 @@
             <DockPanel>
                 <Border DockPanel.Dock="Top" Margin="16,12,16,0" Background="{DynamicResource SegmentBg}" CornerRadius="8" Padding="3" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal">
-                        <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowRepositories, Converter={StaticResource Not}}">
+                        <RadioButton AutomationProperties.Name="Projets locaux" Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowRepositories, Converter={StaticResource Not}}">
                             <TextBlock><Run Text="Projets locaux  " /><Run Text="{Binding ProjectCount, Mode=OneWay}" Foreground="{DynamicResource Muted}" /></TextBlock>
                         </RadioButton>
-                        <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowRepositories}">
+                        <RadioButton AutomationProperties.Name="Repos sur GitHub" Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowRepositories}">
                             <TextBlock><Run Text="Repos sur GitHub  " /><Run Text="{Binding RepositoryCount, Mode=OneWay}" Foreground="{DynamicResource Muted}" /></TextBlock>
                         </RadioButton>
                     </StackPanel>

@@ -23,6 +23,12 @@ public sealed class DialogService : IDialogService
     public void ShowScopes(AccountScopesViewModel viewModel) =>
         new ScopesWindow(viewModel) { Owner = Owner }.ShowDialog();
 
+    public void ShowClone(CloneViewModel viewModel) =>
+        new CloneWindow(viewModel) { Owner = Owner }.ShowDialog();
+
+    public void ShowEditRepository(EditRepositoryViewModel viewModel) =>
+        new EditRepositoryWindow(viewModel) { Owner = Owner }.ShowDialog();
+
     public bool Confirm(string message, string title, bool destructive = false) => SmallDialogs.Confirm(Owner, title, message, destructive);
 
     public int Choose(string title, string message, IReadOnlyList<string> options) =>

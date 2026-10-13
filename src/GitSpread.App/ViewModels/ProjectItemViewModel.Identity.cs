@@ -90,28 +90,31 @@ public sealed partial class ProjectItemViewModel
         }
         finally { _syncingIdentity = false; }
 
-        // 3. À qui GitHub attribuera ces commits ?
-        var owner = Placement.Account;
-        var ownerUser = owner is not null ? users.GetValueOrDefault(owner) : null;
+        // 3. À qui GitHub attribuera ces commits ? Tout compte ayant accès au repo convient (propriétaire ou collaborateur, F3A).
+        var access = Placement.AccessAccounts
+            .Select(a => (Account: a, User: users.FirstOrDefault(u => u.Key.Is(a)).Value))
+            .Where(x => x.User is not null).ToList();
+        var reference = Placement.NetworkAccount;
         var source = settings.HasLocal ? "réglage de ce projet" : "réglage global du poste";
         if (effective.Email is null)
         {
             IdentityStatus = "Aucune identité : git refusera de commiter. Choisis-en une ci-dessus.";
             (IdentityMatches, IdentityMismatch) = (false, true);
         }
-        else if (owner is null || ownerUser is null)
+        else if (reference is null || access.Count == 0)
         {
             IdentityStatus = $"Commits signés {Describe(effective)} ({source}).";
             (IdentityMatches, IdentityMismatch) = (false, false);
         }
-        else if (BelongsTo(effective.Email, owner, ownerUser))
+        else if (access.FirstOrDefault(x => BelongsTo(effective.Email, x.Account, x.User!)) is { Account: { } match })
         {
-            IdentityStatus = $"Commits attribués à {owner.Login} sur GitHub ({source}).";
+            IdentityStatus = $"Commits attribués à {match.Login} sur GitHub ({source}).";
             (IdentityMatches, IdentityMismatch) = (true, false);
         }
         else
         {
-            IdentityStatus = $"Ces commits ne seront pas attribués à {owner.Login}, propriétaire du repo : {effective.Email} n'est pas une adresse connue de ce compte ({source}).";
+            var role = reference.Is(Placement.Account) ? "propriétaire du repo" : "compte qui envoie ce projet";
+            IdentityStatus = $"Ces commits ne seront pas attribués à {reference.Login}, {role} : {effective.Email} n'est pas une adresse connue de ce compte ({source}).";
             (IdentityMatches, IdentityMismatch) = (false, true);
         }
         ForeignUnpushedCount = foreign;

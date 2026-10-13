@@ -1,6 +1,7 @@
 using GitSpread.Core.Accounts;
 using GitSpread.Core.Git;
 using GitSpread.Core.GitHub;
+using GitSpread.Core.Projects;
 using GitSpread.Core.Settings;
 
 namespace GitSpread.App.ViewModels;
@@ -11,6 +12,15 @@ public interface IProjectHost
     AppServices Services { get; }
     IDialogService Dialogs { get; }
     IReadOnlyList<GitHubAccount> Accounts { get; }
+
+    /// <summary>Tous les projets locaux trouvés (pour retrouver ceux liés à un repo GitHub).</summary>
+    IReadOnlyList<LocalProject> LocalProjects { get; }
+
+    Task ReloadRepositoriesAsync(GitHubAccount account);
+
+    /// <summary>Recharge les repos de tous les comptes (collaborations comprises) puis range de nouveau les projets locaux :
+    /// un projet partagé apparaît dans l'onglet de chaque compte qui y a accès (F3A).</summary>
+    Task ReloadCollaborationsAsync();
     AppSettings Settings { get; }
     void SaveSettings();
 
@@ -36,6 +46,8 @@ public interface IDialogService
     bool ShowIntegration(IntegrationViewModel viewModel);
     void ShowRepoint(RepointViewModel viewModel);
     void ShowScopes(AccountScopesViewModel viewModel);
+    void ShowClone(CloneViewModel viewModel);
+    void ShowEditRepository(EditRepositoryViewModel viewModel);
     /// <param name="destructive">Action difficile à défaire : « Non » est le choix par défaut (Entrée).</param>
     bool Confirm(string message, string title, bool destructive = false);
 

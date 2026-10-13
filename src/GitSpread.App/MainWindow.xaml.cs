@@ -191,9 +191,11 @@ public partial class MainWindow : Window
             await project.ChangeLinkedRepositoryAsync(account.Account);
     }
 
-    /// <summary>Un projet peut être déposé sur l'onglet d'un autre compte connecté (étape 5 : passer le projet sur ce compte).</summary>
+    /// <summary>
+    /// Un projet peut être déposé sur l'onglet d'un autre compte connecté : passer le projet sur ce compte (étape 5),
+    /// ou le publier sur ce compte s'il n'a pas encore de remote (même s'il n'est pas encore suivi par git).
+    /// </summary>
     private static bool CanReceive(TabViewModel target, ProjectItemViewModel project) =>
         target is AccountTabViewModel { Account.IsAuthenticated: true } account
-        && project.IsRepository
         && (project.Placement.Account is not { } owner || owner.Login != account.Login || owner.Host != account.Account.Host);
 }

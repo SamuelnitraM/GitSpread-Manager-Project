@@ -19,6 +19,10 @@ public sealed record GitHubAccount(string Login, string Host, bool IsActive, boo
 
     /// <summary>Message d'erreur de gh quand le token n'est plus valide (IsAuthenticated = false).</summary>
     public string? Error { get; init; }
+
+    /// <summary>Même compte (login et hôte), quel que soit son état (actif, autorisations…).</summary>
+    public bool Is(GitHubAccount? other) =>
+        other is not null && Login.Equals(other.Login, StringComparison.OrdinalIgnoreCase) && Host.Equals(other.Host, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>Détecte les comptes GitHub connectés via gh et fournit leurs tokens à la demande.</summary>

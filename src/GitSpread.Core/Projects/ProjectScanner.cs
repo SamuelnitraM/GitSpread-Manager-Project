@@ -14,6 +14,12 @@ public sealed record LocalProject(string Path)
     public RemoteUrl? Remote { get; init; }
     public int RemoteCount { get; init; }
 
+    /// <summary>
+    /// Compte choisi pour échanger avec GitHub (« Envoyer avec le compte », F3A), lu dans .git/config
+    /// (gitspread.pushAccount). Null : le propriétaire du repo.
+    /// </summary>
+    public string? PushAccount { get; init; }
+
     /// <summary>Faux pour un projet ajouté à la main qui n'est pas encore suivi par git.</summary>
     public bool IsRepository { get; init; } = true;
 
@@ -98,13 +104,14 @@ public sealed class ProjectScanner
         var configPath = FindConfig(directory);
         if (configPath is null) return null;
 
-        var remotes = ReadRemotes(configPath);
+        var (remotes, pushAccount) = ReadConfig(configPath);
         var (name, url) = remotes.FirstOrDefault(r => r.Name == "origin") is { Name: not null } origin ? origin : remotes.FirstOrDefault();
         return new LocalProject(directory)
         {
             RemoteName = name,
             Remote = url is null ? null : RemoteUrlParser.Parse(url, ssh),
             RemoteCount = remotes.Count,
+            PushAccount = pushAccount,
         };
     }
 
@@ -134,30 +141,36 @@ public sealed class ProjectScanner
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
     }
 
-    internal static List<(string Name, string Url)> ReadRemotes(string configPath)
+    /// <summary>Remotes (nom, URL) et réglages GitSpread du .git/config.</summary>
+    internal static (List<(string Name, string Url)> Remotes, string? PushAccount) ReadConfig(string configPath)
     {
         var remotes = new List<(string, string)>();
-        string? section = null;
+        string? pushAccount = null;
+        string? remote = null;
+        var inGitSpread = false;
         IEnumerable<string> lines;
         try { lines = File.ReadAllLines(configPath); }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return remotes; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return (remotes, null); }
 
         foreach (var raw in lines)
         {
             var line = raw.Trim();
             if (line.StartsWith('['))
             {
-                // [remote "origin"]
-                section = line.StartsWith("[remote \"") && line.EndsWith("\"]") ? line[9..^2] : null;
+                // [remote "origin"] ou [gitspread] (noms de section et de clé insensibles à la casse)
+                remote = line.StartsWith("[remote \"") && line.EndsWith("\"]") ? line[9..^2] : null;
+                inGitSpread = line.Equals("[gitspread]", StringComparison.OrdinalIgnoreCase);
             }
-            else if (section is not null && line.Split('=', 2) is [var key, var value]
-                     && key.Trim().Equals("url", StringComparison.OrdinalIgnoreCase)
-                     && !remotes.Any(r => r.Item1 == section))
+            else if (line.Split('=', 2) is [var rawKey, var value])
             {
-                remotes.Add((section, UnescapeConfigValue(value.Trim())));
+                var key = rawKey.Trim();
+                if (remote is not null && key.Equals("url", StringComparison.OrdinalIgnoreCase) && !remotes.Any(r => r.Item1 == remote))
+                    remotes.Add((remote, UnescapeConfigValue(value.Trim())));
+                else if (inGitSpread && key.Equals("pushAccount", StringComparison.OrdinalIgnoreCase))
+                    pushAccount = UnescapeConfigValue(value.Trim()) is { Length: > 0 } login ? login : null;
             }
         }
-        return remotes;
+        return (remotes, pushAccount);
     }
 
     /// <summary>Valeur de .git/config : guillemets retirés et échappements résolus (\\ → \, \" → ", \t, \n).</summary>
