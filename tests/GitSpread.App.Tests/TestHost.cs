@@ -1,4 +1,3 @@
-using System.IO;
 using GitSpread.App.ViewModels;
 using GitSpread.Core.Accounts;
 using GitSpread.Core.Git;
@@ -17,21 +16,25 @@ public sealed class TestHost : IProjectHost, IDialogService
     public static readonly GitHubAccount Pro = new("SmartDev-Web", "github.com", IsActive: true, IsAuthenticated: true);
     public static readonly GitHubAccount Perso = new("SamuelnitraM", "github.com", IsActive: false, IsAuthenticated: true);
 
-    public TestHost(params GitHubAccount[] accounts)
+    public TestHost(params GitHubAccount[] accounts) : this(realGit: false, accounts) { }
+
+    /// <param name="realGit">Vrai : git est réellement exécuté (dépôts temporaires), seul gh est simulé.</param>
+    public TestHost(bool realGit, params GitHubAccount[] accounts)
     {
         Runner = new FakeProcessRunner()
             .When(["auth", "token"], "gho_tokenDeTest_0123456789abcdef")
             .When(["repo", "view"], "", exitCode: 1, stderr: "Could not resolve to a Repository")
             .When(["repo", "list"], "[]");
-        var gh = new GhCli(Runner);
+        Core.Processes.IProcessRunner runner = realGit ? new RoutingRunner(Runner) : Runner;
+        var gh = new GhCli(runner);
         var accountService = new AccountService(gh);
         var gitHub = new GitHubService(gh, accountService);
-        var git = new GitService(Runner);
+        var git = new GitService(runner);
         var credentials = new GitCredentialResolver(accountService);
         var dir = Directory.CreateTempSubdirectory("GitSpread app tests ").FullName;
         Services = new AppServices(accountService, gitHub, new LoginService(gh, accountService), git, credentials,
             new ProjectPublisher(git, gitHub, credentials), new BranchIntegrator(git), new TransferService(git, gitHub, credentials),
-            new SshKeyService(Runner, Path.Combine(dir, ".ssh")), new ProjectScanner(),
+            new SshKeyService(runner, Path.Combine(dir, ".ssh")), new ProjectScanner(),
             new SettingsStore(Path.Combine(dir, "settings.json")), NullLoggerFactory.Instance, dir);
         Accounts = accounts.Length > 0 ? accounts : [Pro, Perso];
     }
@@ -42,13 +45,22 @@ public sealed class TestHost : IProjectHost, IDialogService
     public IReadOnlyList<GitHubAccount> Accounts { get; }
     public AppSettings Settings { get; } = new();
     public void SaveSettings() { }
+
+    /// <summary>Profils GitHub renvoyés par <see cref="GetAccountUserAsync"/> (sans e-mail public par défaut).</summary>
+    public Dictionary<string, GitHubUser?> Users { get; } = new()
+    {
+        [Pro.Login] = new GitHubUser(1001, Pro.Login),
+        [Perso.Login] = new GitHubUser(2002, Perso.Login) { Name = "Samuel" },
+    };
+
+    public Task<GitHubUser?> GetAccountUserAsync(GitHubAccount account) => Task.FromResult(Users.GetValueOrDefault(account.Login));
     public Task RescanAsync(string? revealPath = null) => Task.CompletedTask;
     public Task RemoveExtraProjectAsync(string path) => Task.CompletedTask;
 
     /// <summary>Projet local de test (rien n'est lu sur le disque tant qu'on ne charge pas ses détails).</summary>
-    public ProjectItemViewModel Project(string name = "Mon projet", GitHubAccount? account = null, string? remote = null) =>
+    public ProjectItemViewModel Project(string name = "Mon projet", GitHubAccount? account = null, string? remote = null, string? path = null) =>
         new(new ProjectPlacement(
-            new LocalProject(Path.Combine(Path.GetTempPath(), name)) { Remote = remote is null ? null : RemoteUrlParser.Parse(remote), RemoteName = remote is null ? null : "origin" },
+            new LocalProject(path ?? Path.Combine(Path.GetTempPath(), name)) { Remote = remote is null ? null : RemoteUrlParser.Parse(remote), RemoteName = remote is null ? null : "origin" },
             account, account is null ? UnlinkedReason.NoRemote : null), this);
 
     /// <summary>Attend qu'une condition devienne vraie (vérifications GitHub asynchrones).</summary>

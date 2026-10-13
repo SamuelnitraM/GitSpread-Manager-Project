@@ -267,6 +267,49 @@
                         </Border>
 
                         <StackPanel Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
+                            <!-- Qui signe les commits de ce projet (F2) -->
+                            <TextBlock Text="COMMITS SIGNÉS PAR" Style="{StaticResource SectionLabel}" />
+                            <ComboBox ItemsSource="{Binding IdentityChoices}" SelectedItem="{Binding SelectedIdentityChoice}" DisplayMemberPath="Label"
+                                      AutomationProperties.Name="Commits signés par" IsEnabled="{Binding IsBusy, Converter={StaticResource Not}}"
+                                      ToolTip="Nom et e-mail enregistrés dans chaque commit : c'est ce qui décide à quel compte GitHub le commit est attribué" />
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock DockPanel.Dock="Left" Margin="0,2,8,0" VerticalAlignment="Top">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Glyph}">
+                                            <Setter Property="Text" Value="&#xE946;" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IdentityMatches}" Value="True">
+                                                    <Setter Property="Text" Value="&#xE73E;" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource Success}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IdentityMismatch}" Value="True">
+                                                    <Setter Property="Text" Value="&#xE7BA;" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding IdentityStatus}" TextWrapping="Wrap" FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IdentityMismatch}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DockPanel>
+                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding FixUnpushedAuthorsCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                    Visibility="{Binding HasForeignUnpushed, Converter={StaticResource BoolToVisibility}}" IsEnabled="{Binding IsBusy, Converter={StaticResource Not}}"
+                                    ToolTip="Ces commits ne sont pas encore sur GitHub : on peut changer leur signature sans rien forcer. Contenu et dates inchangés.">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE70F;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="{Binding FixAuthorsLabel}" /></StackPanel>
+                            </Button>
+
                             <TextBlock Style="{StaticResource SectionLabel}"><Run Text="BRANCHE " /><Run Text="{Binding BranchLabel, Mode=OneWay}" /></TextBlock>
                             <TextBlock Text="{Binding TrackingLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
                                        ToolTip="Calculé d'après le dernier « Récupérer » : GitSpread ne contacte pas GitHub pour cet affichage." />
@@ -329,8 +372,6 @@
                             <TextBlock Text="{Binding LastCommitSubject}" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding LastCommitMeta}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,2,0,0" />
 
-                            <TextBlock Text="IDENTITÉ DES COMMITS" Style="{StaticResource SectionLabel}" />
-                            <TextBox Text="{Binding IdentityLabel, Mode=OneWay}" Style="{StaticResource SelectableText}" />
                         </StackPanel>
 
                         <WrapPanel Margin="0,20,0,0">

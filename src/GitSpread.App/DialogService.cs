@@ -20,8 +20,7 @@ public sealed class DialogService : IDialogService
     public void ShowRepoint(RepointViewModel viewModel) =>
         new RepointWindow(viewModel) { Owner = Owner }.ShowDialog();
 
-    public bool Confirm(string message, string title) =>
-        MessageBox.Show(Owner!, message, title, MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+    public bool Confirm(string message, string title) => SmallDialogs.Confirm(Owner, title, message);
 
     public int Choose(string title, string message, IReadOnlyList<string> options) =>
         SmallDialogs.Choose(Owner, title, message, options);

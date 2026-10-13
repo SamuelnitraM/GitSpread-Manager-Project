@@ -18,10 +18,12 @@
   <ItemGroup>
     <!-- Faux lanceur de processus partagé avec les tests du Core -->
     <Compile Include="..\GitSpread.Tests\Fakes\FakeProcessRunner.cs" Link="Fakes\FakeProcessRunner.cs" />
+    <Compile Include="..\GitSpread.Tests\Fakes\TempRepo.cs" Link="Fakes\TempRepo.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="System.IO" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using GitSpread.Core.Accounts;
 using GitSpread.Core.Git;
+using GitSpread.Core.GitHub;
 using GitSpread.Core.Settings;
 
 namespace GitSpread.App.ViewModels;
@@ -12,6 +13,10 @@ public interface IProjectHost
     IReadOnlyList<GitHubAccount> Accounts { get; }
     AppSettings Settings { get; }
     void SaveSettings();
+
+    /// <summary>Profil GitHub du compte (id, nom, e-mail public), mis en cache jusqu'à la prochaine actualisation.
+    /// Null si GitHub est injoignable.</summary>
+    Task<GitHubUser?> GetAccountUserAsync(GitHubAccount account);
 
     /// <summary>Relance l'analyse (le projet a pu changer d'onglet) puis le resélectionne.</summary>
     Task RescanAsync(string? revealPath = null);

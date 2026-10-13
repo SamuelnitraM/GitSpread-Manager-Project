@@ -41,6 +41,7 @@ public sealed partial class RepointViewModel : FormViewModel
         NewName = project.Remote?.Repository ?? RepositoryName.FromFolder(project.Name);
         CreateNew = true;
         NewBranchName = BranchName.ReplaceSpaces($"import-{project.BranchLabel}");
+        SignWithTarget = SelectedAccount is { } target && target.Login != project.Placement.Account?.Login;
         _ready = true;
         ValidateNewName();
         UpdatePreview();
@@ -79,6 +80,12 @@ public sealed partial class RepointViewModel : FormViewModel
     [ObservableProperty] public partial bool KeepOldLink { get; set; } = true;
     [ObservableProperty] public partial bool PushAllBranches { get; set; } = true;
 
+    /// <summary>Après le changement, signer les commits avec l'identité du compte cible (adresse privée GitHub).</summary>
+    [ObservableProperty] public partial bool SignWithTarget { get; set; }
+    public string SignWithTargetLabel => SelectedAccount is { } a
+        ? $"Signer désormais les commits de ce projet en tant que {a.Login} (adresse privée GitHub)"
+        : "";
+
     [ObservableProperty] public partial string? TargetSummary { get; set; }
     [ObservableProperty] public partial bool TargetDiverges { get; set; }
     [ObservableProperty] public partial bool IsAnalyzingTarget { get; set; }
@@ -109,6 +116,9 @@ public sealed partial class RepointViewModel : FormViewModel
         OnPropertyChanged(nameof(Title));
         if (!CanNativeTransfer) Mode = RepointMode.Repoint;
         AccountError = null;
+        // Changer de compte : par défaut, les commits suivent (on ne garde l'identité que pour le même compte).
+        SignWithTarget = value is not null && value.Login != _project.Placement.Account?.Login;
+        OnPropertyChanged(nameof(SignWithTargetLabel));
         _ = LoadRepositoriesAsync();
         ValidateNewName();
         UpdatePreview();
@@ -137,6 +147,7 @@ public sealed partial class RepointViewModel : FormViewModel
     }
     partial void OnKeepOldLinkChanged(bool value) { if (_ready) UpdatePreview(); }
     partial void OnPushAllBranchesChanged(bool value) { if (_ready) UpdatePreview(); }
+    partial void OnSignWithTargetChanged(bool value) { if (_ready) UpdatePreview(); }
     partial void OnUseNewBranchChanged(bool value) { if (!_ready) return; if (value) DivergeError = null; ValidateNewBranchName(); UpdatePreview(); }
     partial void OnNewBranchNameChanged(string value) { if (!_ready) return; ValidateNewBranchName(); UpdatePreview(); }
 
@@ -251,10 +262,11 @@ public sealed partial class RepointViewModel : FormViewModel
         {
             Preview.Add($"gh api --method POST repos/{remote.FullName}/transfer -f new_owner={to.Login}   (avec le compte {SourceAccountLogin})");
             Preview.Add($"git remote set-url {_project.Project.RemoteName ?? "origin"} https://{to.Host}/{to.Login}/{remote.Repository}.git");
-            return;
         }
-        if (BuildPlan() is { } plan)
+        else if (BuildPlan() is { } plan)
             foreach (var line in TransferService.Preview(plan, _project.Remote?.Url, _project.BranchLabel)) Preview.Add(line);
+        if (SignWithTarget && SelectedAccount is { } signer)
+            Preview.Add($"git config --local user.name / user.email   (identité de {signer.Login}, adresse privée GitHub)");
     }
 
     [RelayCommand]
@@ -279,7 +291,7 @@ public sealed partial class RepointViewModel : FormViewModel
                 ? await _host.Services.Transfer.TransferOwnershipAsync(_project.Path, _project.Placement.Account!, SelectedAccount!,
                     _project.Remote!.Repository!, _project.Project.RemoteName ?? "origin", progress)
                 : await _host.Services.Transfer.RepointAsync(BuildPlan()!, progress);
-            ResultMessage = result.Message;
+            ResultMessage = result.Message + await ApplyTargetIdentityAsync();
             Done = true;
             Step = RepointStep.Done;
         }
@@ -309,6 +321,18 @@ public sealed partial class RepointViewModel : FormViewModel
             : null;
         ValidateNewBranchName();
         return AccountError is null && NewNameError is null && RepositoryChoiceError is null && DivergeError is null && NewBranchNameError is null;
+    }
+
+    /// <summary>Les prochains commits seront attribués au compte cible (si demandé). Renvoie la phrase à ajouter au compte rendu.</summary>
+    private async Task<string> ApplyTargetIdentityAsync()
+    {
+        if (!SignWithTarget || SelectedAccount is not { } account) return "";
+        if (await _host.GetAccountUserAsync(account) is not { } user)
+            return $" L'identité de {account.Login} n'a pas pu être lue sur GitHub : choisis-la dans « Commits signés par ».";
+        var results = await _host.Services.Git.SetLocalIdentityAsync(_project.Path, user.Name ?? user.Login, user.NoReplyEmail);
+        return results.All(r => r.Succeeded)
+            ? $" Les prochains commits seront signés {user.Name ?? user.Login} <{user.NoReplyEmail}>."
+            : $" L'identité n'a pas pu être changée : {results.First(r => !r.Succeeded).Output}";
     }
 
     [RelayCommand] private void BackToForm() => Step = RepointStep.Form;

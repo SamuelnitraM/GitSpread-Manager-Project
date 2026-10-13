@@ -40,8 +40,7 @@ public sealed partial class IdentityViewModel(string path, IProjectHost host) : 
         GitHubUser? user = null;
         if (account is { IsAuthenticated: true })
         {
-            try { user = await Services.GitHub.GetUserAsync(account); }
-            catch (Exception) { /* hors ligne : on garde l'avertissement générique */ }
+            user = await host.GetAccountUserAsync(account); // null hors ligne : avertissement générique
         }
         Suggested = user is null ? null : new GitIdentity(user.Name ?? user.Login, user.NoReplyEmail);
 

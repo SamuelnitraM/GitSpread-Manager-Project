@@ -50,6 +50,26 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
     public IDialogService Dialogs { get; }
     public IReadOnlyList<GitHubAccount> Accounts => _accounts;
     public void SaveSettings() => _services.SettingsStore.Save(Settings);
+
+    private readonly Dictionary<string, Task<GitHubUser?>> _users = new(StringComparer.OrdinalIgnoreCase);
+
+    public Task<GitHubUser?> GetAccountUserAsync(GitHubAccount account)
+    {
+        var key = AppSettings.AccountKey(account.Host, account.Login);
+        if (!_users.TryGetValue(key, out var task) || task is { IsCompleted: true, Result: null })
+            _users[key] = task = LoadUserAsync(account);
+        return task;
+    }
+
+    private async Task<GitHubUser?> LoadUserAsync(GitHubAccount account)
+    {
+        try { return await _services.GitHub.GetUserAsync(account); }
+        catch (Exception e)
+        {
+            _logger.LogWarning(e, "Profil GitHub de {Login} indisponible", account.Login);
+            return null;
+        }
+    }
     public AppSettings Settings { get; private set; }
     public string LogDirectory => _services.LogDirectory;
 
@@ -71,6 +91,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
     {
         IsLoading = true;
         GlobalError = null;
+        _users.Clear();
         try
         {
             _accounts = await _services.Accounts.GetAccountsAsync();

@@ -157,6 +157,14 @@
                         </Border>
                     </StackPanel>
 
+                    <!-- F2 : les commits suivent le compte -->
+                    <CheckBox IsChecked="{Binding SignWithTarget}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SignWithTargetLabel}" TextWrapping="Wrap" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Sinon, les commits restent signés avec l'identité actuelle et GitHub les attribuera à son propriétaire, pas au compte cible." />
+                        </StackPanel>
+                    </CheckBox>
+
                     <TextBlock Text="Ce que GitSpread va exécuter" Style="{StaticResource FieldLabel}" />
                     <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8">
                         <ItemsControl ItemsSource="{Binding Preview}">

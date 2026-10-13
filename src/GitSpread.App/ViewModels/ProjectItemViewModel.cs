@@ -149,6 +149,7 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
             };
             await LoadBranchStateAsync();
             HasDetails = true;
+            _ = LoadIdentitySafeAsync(); // profils GitHub : chargés sans retarder l'affichage du panneau
         }
         catch (Exception e)
         {

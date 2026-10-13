@@ -37,6 +37,33 @@ internal static class SmallDialogs
         return result;
     }
 
+    /// <summary>Question fermée, aux couleurs de l'application (la MessageBox de Windows ignore le thème).</summary>
+    public static bool Confirm(Window? owner, string title, string message)
+    {
+        var result = false;
+        var window = Create(owner, title);
+        var panel = new StackPanel { Margin = new Thickness(24, 20, 24, 20) };
+        var text = new DockPanel();
+        var icon = new TextBlock { Text = "", FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"), FontSize = 20, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Top };
+        icon.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
+        DockPanel.SetDock(icon, Dock.Left);
+        text.Children.Add(icon);
+        text.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(text);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
+        var no = new Button { Style = (Style)Application.Current.Resources["SecondaryButton"], Content = "Non", IsCancel = true, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+        var yes = new Button { Style = (Style)Application.Current.Resources["PrimaryButton"], Content = "Oui", IsDefault = true, MinWidth = 80 };
+        no.Click += (_, _) => window.Close();
+        yes.Click += (_, _) => { result = true; window.Close(); };
+        buttons.Children.Add(no);
+        buttons.Children.Add(yes);
+        panel.Children.Add(buttons);
+        window.Content = panel;
+        window.Loaded += (_, _) => yes.Focus();
+        window.ShowDialog();
+        return result;
+    }
+
     public static string? Prompt(Window? owner, string title, string message, string initial,
         Func<string, string?>? validate = null, bool spacesToDash = false)
     {
