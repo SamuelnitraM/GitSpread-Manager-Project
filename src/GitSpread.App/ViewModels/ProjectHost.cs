@@ -16,6 +16,7 @@ public interface IProjectHost
     /// <summary>Tous les projets locaux trouvés (pour retrouver ceux liés à un repo GitHub).</summary>
     IReadOnlyList<LocalProject> LocalProjects { get; }
 
+
     Task ReloadRepositoriesAsync(GitHubAccount account);
 
     /// <summary>Recharge les repos de tous les comptes (collaborations comprises) puis range de nouveau les projets locaux :

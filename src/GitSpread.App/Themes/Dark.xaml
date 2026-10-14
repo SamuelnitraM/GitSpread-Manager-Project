@@ -24,4 +24,24 @@
     <SolidColorBrush x:Key="CodeBg" Color="#010409" />
     <SolidColorBrush x:Key="CodeText" Color="#E6EDF3" />
     <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+
+    <!-- Graphe des branches (F6a) : principale en bleu franc, branches classiques en bleus clairs, maintenance en jaune / orange / rouge -->
+    <SolidColorBrush x:Key="BranchMain" Color="#3B82F6" />
+    <SolidColorBrush x:Key="BranchNeutral" Color="#6E7681" />
+    <SolidColorBrush x:Key="BranchClassic0" Color="#93C5FD" />
+    <SolidColorBrush x:Key="BranchClassic1" Color="#67E8F9" />
+    <SolidColorBrush x:Key="BranchClassic2" Color="#A5B4FC" />
+    <SolidColorBrush x:Key="BranchClassic3" Color="#7DD3FC" />
+    <SolidColorBrush x:Key="BranchClassic4" Color="#99F6E4" />
+    <SolidColorBrush x:Key="BranchClassic5" Color="#C7D2FE" />
+    <SolidColorBrush x:Key="BranchMaint0" Color="#FACC15" />
+    <SolidColorBrush x:Key="BranchMaint1" Color="#FB923C" />
+    <SolidColorBrush x:Key="BranchMaint2" Color="#F87171" />
+    <SolidColorBrush x:Key="BranchMaint3" Color="#FDE68A" />
+    <SolidColorBrush x:Key="BranchMaint4" Color="#F97316" />
+    <SolidColorBrush x:Key="BranchMaint5" Color="#EF4444" />
+    <SolidColorBrush x:Key="DiffAddedBg" Color="#16301F" />
+    <SolidColorBrush x:Key="DiffAddedText" Color="#7EE787" />
+    <SolidColorBrush x:Key="DiffRemovedBg" Color="#3A1A1D" />
+    <SolidColorBrush x:Key="DiffRemovedText" Color="#FFA198" />
 </ResourceDictionary>

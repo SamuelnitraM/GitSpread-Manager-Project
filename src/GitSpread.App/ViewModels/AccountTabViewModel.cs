@@ -89,14 +89,34 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
     [ObservableProperty] public partial RepositoryItemViewModel? SelectedRepository { get; set; }
     [ObservableProperty] public partial GitHubRepositoryViewModel? RepositoryPanel { get; set; }
     public bool HasRepositoryPanel => RepositoryPanel is not null;
-    partial void OnRepositoryPanelChanged(GitHubRepositoryViewModel? value) => OnPropertyChanged(nameof(HasRepositoryPanel));
+    partial void OnRepositoryPanelChanged(GitHubRepositoryViewModel? value)
+    {
+        OnPropertyChanged(nameof(HasRepositoryPanel));
+        if (value is null) UpdateHistory();
+    }
 
     partial void OnSelectedRepositoryChanged(RepositoryItemViewModel? value)
     {
         if (value is null) return; // la liste se vide le temps d'un filtrage : le panneau reste affiché
         if (RepositoryPanel?.FullName == value.Repository.FullName) return;
         RepositoryPanel = new GitHubRepositoryViewModel(this, value.Repository, host, logger);
-        _ = RepositoryPanel.LoadAsync();
+        _ = LoadPanelAsync(RepositoryPanel);
+    }
+
+    private async Task LoadPanelAsync(GitHubRepositoryViewModel panel)
+    {
+        await panel.LoadAsync();
+        if (RepositoryPanel == panel) UpdateHistory(); // les projets locaux liés sont connus une fois le panneau chargé
+    }
+
+    partial void OnShowRepositoriesChanged(bool value) => UpdateHistory();
+
+    /// <summary>Dans « Repos sur GitHub », l'aperçu montre l'historique du projet local lié au repo choisi, ou propose de le cloner.</summary>
+    protected override void UpdateHistory()
+    {
+        if (!ShowRepositories) { base.UpdateHistory(); return; }
+        var panel = RepositoryPanel;
+        _ = History?.ShowRepositoryAsync(panel?.Name, panel?.LinkedProjects.FirstOrDefault(), panel?.CloneCommand);
     }
 
     [ObservableProperty] public partial bool IsLoadingRepositories { get; set; }
@@ -106,6 +126,13 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
 
     public bool HasError => Error is not null;
     public int RepositoryCount => _allRepositories.Count;
+
+    /// <summary>Tous les repos du compte, collaborations comprises (onglet « Projets » de l'historique en grand).</summary>
+    public IEnumerable<GitHubRepository> AllRepositories => _allRepositories.Select(r => r.Repository);
+
+    /// <summary>Dans « Repos sur GitHub », l'historique en grand s'ouvre sur le repo choisi.</summary>
+    protected override string? ExplorerKey() =>
+        ShowRepositories ? RepositoryPanel?.LinkedProjects.FirstOrDefault()?.Path ?? RepositoryPanel?.FullName : base.ExplorerKey();
     public bool HasNoRepositories => !IsLoadingRepositories && Error is null && Repositories.Count == 0;
 
     partial void OnShowArchivedChanged(bool value) => ApplyFilter();
@@ -149,6 +176,7 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
                     + (repos.Count >= GitHubService.DefaultLimit ? $" (limité aux {GitHubService.DefaultLimit} plus récents)" : "");
             OnPropertyChanged(nameof(RepositoryCount));
             ApplyFilter();
+            Explorer?.Refresh();
         }
         catch (Exception e)
         {

@@ -8,7 +8,7 @@
         xmlns:views="clr-namespace:GitSpread.App.Views"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:MainViewModel}"
-        Title="GitSpread" Width="1240" Height="780" MinWidth="900" MinHeight="520"
+        Title="GitSpread" Width="1400" Height="860" MinWidth="980" MinHeight="560"
         WindowStartupLocation="CenterScreen" Icon="Assets/GitSpread.ico"
         Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         FontFamily="Segoe UI" FontSize="13">
@@ -92,7 +92,11 @@
 
         <!-- ===== Contenus d'onglets ===== -->
         <DataTemplate x:Key="AccountContent" DataType="{x:Type vm:AccountTabViewModel}">
-            <DockPanel>
+            <Grid>
+            <!-- Historique en grand, à la place du contenu de l'onglet -->
+            <views:HistoryExplorerView DataContext="{Binding Explorer}"
+                                       Visibility="{Binding DataContext.IsExplorerOpen, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}" />
+            <DockPanel Visibility="{Binding IsExplorerOpen, Converter={StaticResource InverseBoolToVisibility}}">
                 <Border DockPanel.Dock="Top" Margin="16,12,16,0" Background="{DynamicResource SegmentBg}" CornerRadius="8" Padding="3" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton AutomationProperties.Name="Projets locaux" Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowRepositories, Converter={StaticResource Not}}">
@@ -103,15 +107,25 @@
                         </RadioButton>
                     </StackPanel>
                 </Border>
+                <!-- Aperçu de l'historique sur toute la largeur, en bas (F6a) -->
+                <views:HistoryPreview DockPanel.Dock="Bottom" DataContext="{Binding History}" />
                 <Grid>
                     <views:ProjectsView Visibility="{Binding ShowRepositories, Converter={StaticResource InverseBoolToVisibility}}" />
                     <views:RepositoriesView Visibility="{Binding ShowRepositories, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </DockPanel>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="OtherContent" DataType="{x:Type vm:UnlinkedTabViewModel}">
-            <views:ProjectsView />
+            <Grid>
+                <views:HistoryExplorerView DataContext="{Binding Explorer}"
+                                           Visibility="{Binding DataContext.IsExplorerOpen, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}" />
+                <DockPanel Visibility="{Binding IsExplorerOpen, Converter={StaticResource InverseBoolToVisibility}}">
+                    <views:HistoryPreview DockPanel.Dock="Bottom" DataContext="{Binding History}" />
+                    <views:ProjectsView />
+                </DockPanel>
+            </Grid>
         </DataTemplate>
 
         <app:TabTemplateSelector x:Key="HeaderSelector" Account="{StaticResource AccountHeader}" Other="{StaticResource OtherHeader}" />

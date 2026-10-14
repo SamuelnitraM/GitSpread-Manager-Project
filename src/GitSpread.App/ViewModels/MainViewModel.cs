@@ -46,12 +46,42 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         Dialogs = dialogs;
         _logger = services.LoggerFactory.CreateLogger<MainViewModel>();
         Settings = services.SettingsStore.Load();
+        _unlinked.History = NewHistory();
+        ShowHistoryPreview = Settings.ShowHistoryPreview;
+        // 240 : ancienne hauteur par défaut des essais de F6a, remplacée par la hauteur minimale.
+        HistoryPreviewHeight = Settings.HistoryPreviewHeight is 240 ? 110 : Math.Max(110, Settings.HistoryPreviewHeight);
     }
 
     public AppServices Services => _services;
     public IDialogService Dialogs { get; }
     public IReadOnlyList<GitHubAccount> Accounts => _accounts;
     public IReadOnlyList<LocalProject> LocalProjects => _projects;
+
+    // ------------------------------------------------------------ aperçu de l'historique (F6a)
+
+    private HistoryViewModel NewHistory() => new(this) { PageSize = Settings.HistoryPageSize };
+
+    /// <summary>Aperçu de l'historique en bas de page : déplié ou replié (mémorisé).</summary>
+    [ObservableProperty] public partial bool ShowHistoryPreview { get; set; }
+
+    /// <summary>Hauteur de l'aperçu, ajustée en tirant son bord supérieur (mémorisée à la fin du geste).</summary>
+    [ObservableProperty] public partial double HistoryPreviewHeight { get; set; }
+
+    partial void OnShowHistoryPreviewChanged(bool value)
+    {
+        if (Settings.ShowHistoryPreview == value) return;
+        Settings.ShowHistoryPreview = value;
+        SaveSettings();
+    }
+
+    public void SaveHistoryPreviewHeight()
+    {
+        Settings.HistoryPreviewHeight = HistoryPreviewHeight;
+        SaveSettings();
+    }
+
+    [RelayCommand]
+    private void ToggleHistoryPreview() => ShowHistoryPreview = !ShowHistoryPreview;
 
     /// <summary>Recharge la liste des repos GitHub d'un compte (après un renommage, une suppression…).</summary>
     public Task ReloadRepositoriesAsync(GitHubAccount account) =>
@@ -256,7 +286,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         foreach (var account in _accounts)
         {
             if (existing.TryGetValue((account.Login, account.Host), out var tab)) tab.Account = account;
-            else tab = new AccountTabViewModel(account, this, _logger);
+            else tab = new AccountTabViewModel(account, this, _logger) { History = NewHistory() };
             Tabs.Add(tab);
         }
         Tabs.Add(_unlinked);

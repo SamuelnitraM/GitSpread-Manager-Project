@@ -26,6 +26,13 @@ public sealed class AppSettings
     /// en plus de ceux que GitHub expose publiquement.</summary>
     public Dictionary<string, List<string>> AccountEmails { get; set; } = [];
 
+    /// <summary>Aperçu de l'historique en bas de page (F6a) : affiché ou replié, et sa hauteur.</summary>
+    public bool ShowHistoryPreview { get; set; } = true;
+    public double HistoryPreviewHeight { get; set; } = 110;
+
+    /// <summary>Nombre de commits chargés à chaque fois dans l'historique (« Afficher plus » charge la suite).</summary>
+    public int HistoryPageSize { get; set; } = 300;
+
     /// <summary>Projets sans remote rangés à la main dans un compte (chemin → clé « hôte/login »).</summary>
     public Dictionary<string, string> ProjectAccounts { get; set; } = [];
 

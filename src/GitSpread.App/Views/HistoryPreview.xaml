@@ -1,0 +1,55 @@
+<UserControl x:Class="GitSpread.App.Views.HistoryPreview"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+             xmlns:views="clr-namespace:GitSpread.App.Views"
+             mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:HistoryViewModel}">
+    <!-- Aperçu de l'historique en bas de page (F6a) : redimensionnable par son bord supérieur, repliable -->
+    <DockPanel>
+        <Thumb DockPanel.Dock="Top" Height="5" Cursor="SizeNS" DragDelta="Resize_DragDelta" DragCompleted="Resize_DragCompleted"
+               ToolTip="Tirer pour agrandir ou réduire l'aperçu"
+               Visibility="{Binding DataContext.ShowHistoryPreview, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}">
+            <Thumb.Template>
+                <ControlTemplate TargetType="Thumb"><Border Background="{DynamicResource Border}" /></ControlTemplate>
+            </Thumb.Template>
+        </Thumb>
+        <Border DockPanel.Dock="Top" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,0,1" Padding="12,4">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding OpenLargeCommand}" AutomationProperties.Name="Ouvrir l historique en grand"
+                            ToolTip="Ouvrir l'historique en grand : projets, branches, détail des commits et modifications">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE740;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,6,0" /><TextBlock Text="Ouvrir en grand" FontSize="12" /></StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding ReloadCommand}" AutomationProperties.Name="Relire l historique" ToolTip="Relire l'historique">
+                        <TextBlock Text="&#xE72C;" Style="{StaticResource Glyph}" FontSize="12" />
+                    </Button>
+                    <Button Command="{Binding DataContext.ToggleHistoryPreviewCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            AutomationProperties.Name="Replier ou déplier l historique">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Setter Property="Content"><Setter.Value><TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="12" /></Setter.Value></Setter>
+                                <Setter Property="ToolTip" Value="Replier l'aperçu" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.ShowHistoryPreview, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                        <Setter Property="Content"><Setter.Value><TextBlock Text="&#xE70E;" Style="{StaticResource Glyph}" FontSize="12" /></Setter.Value></Setter>
+                                        <Setter Property="ToolTip" Value="Déplier l'aperçu de l'historique" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="&#xE81C;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="0,0,8,0" />
+                    <TextBlock Text="Historique" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Project.Name, StringFormat=' · {0}'}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <views:HistoryView x:Name="Body" Height="{Binding DataContext.HistoryPreviewHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                           Visibility="{Binding DataContext.ShowHistoryPreview, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
+    </DockPanel>
+</UserControl>

@@ -50,3 +50,13 @@ public sealed class InverseBoolToVisibilityConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>Couleur d'une branche (graphe, étiquettes) selon le thème courant.</summary>
+public sealed class BranchColorToBrushConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is Core.Git.BranchColor color ? Controls.BranchBrushes.For(color) : System.Windows.Media.Brushes.Gray;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

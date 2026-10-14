@@ -37,10 +37,61 @@ public abstract partial class TabViewModel : ObservableObject
     partial void OnFilterChanged(string value) => ApplyFilter();
     partial void OnIsScanningChanged(bool value) => OnPropertyChanged(nameof(HasNoProjects));
 
-    partial void OnSelectedProjectChanged(ProjectItemViewModel? value)
+    partial void OnSelectedProjectChanged(ProjectItemViewModel? oldValue, ProjectItemViewModel? newValue)
     {
         OnPropertyChanged(nameof(HasSelection));
-        if (value is not null) _ = value.LoadDetailsAsync();
+        if (oldValue is not null) oldValue.DetailsLoaded -= OnProjectDetailsLoaded;
+        if (newValue is not null)
+        {
+            newValue.DetailsLoaded += OnProjectDetailsLoaded;
+            _ = newValue.LoadDetailsAsync();
+        }
+        UpdateHistory();
+    }
+
+    public IReadOnlyList<ProjectItemViewModel> AllProjects => _allProjects;
+
+    // ------------------------------------------------------------ aperçu de l'historique (F6a)
+
+    /// <summary>Aperçu de l'historique en bas de page, fourni par la fenêtre principale.</summary>
+    public HistoryViewModel? History
+    {
+        get => _history;
+        set
+        {
+            if (_history is not null) _history.OpenLargeRequested -= OnOpenLargeRequested;
+            _history = value;
+            if (value is not null) value.OpenLargeRequested += OnOpenLargeRequested;
+        }
+    }
+    private HistoryViewModel? _history;
+
+    /// <summary>Historique en grand, affiché à la place du contenu de l'onglet (les onglets restent accessibles).</summary>
+    [ObservableProperty] public partial HistoryExplorerViewModel? Explorer { get; set; }
+    public bool IsExplorerOpen => Explorer is not null;
+    partial void OnExplorerChanged(HistoryExplorerViewModel? value) => OnPropertyChanged(nameof(IsExplorerOpen));
+
+    private void OnOpenLargeRequested(object? sender, HistoryOpenRequest request)
+    {
+        if (History is null) return;
+        Explorer = new HistoryExplorerViewModel(this, History.Host, request.Key ?? ExplorerKey(), request.Sha);
+        Explorer.Start();
+    }
+
+    /// <summary>Élément à montrer en grand quand l'aperçu n'affiche aucun projet (ex. repo GitHub pas encore cloné).</summary>
+    protected virtual string? ExplorerKey() => SelectedProject?.Path;
+
+    /// <summary>Retour à l'affichage habituel de l'onglet.</summary>
+    public void CloseExplorer() => Explorer = null;
+
+    /// <summary>Affiche dans l'aperçu l'historique de ce qui est sélectionné dans l'onglet.</summary>
+    protected virtual void UpdateHistory() => _ = History?.ShowAsync(SelectedProject);
+
+    // Après une action (commit, envoi, branche…), l'aperçu se met à jour s'il montre ce projet.
+    private void OnProjectDetailsLoaded(object? sender, EventArgs e)
+    {
+        if (History is { IsLoading: false, Project: { } shown } && sender is ProjectItemViewModel p && p.Path == shown.Path)
+            _ = History.ReloadCommand.ExecuteAsync(null);
     }
 
     public void SetProjects(IEnumerable<ProjectItemViewModel> projects)
@@ -52,6 +103,7 @@ public abstract partial class TabViewModel : ObservableObject
         OnPropertyChanged(nameof(ProjectCount));
         OnPropertyChanged(nameof(ProjectsSummary));
         OnPropertyChanged(nameof(HasNoProjects));
+        Explorer?.Refresh();
     }
 
     protected virtual void ApplyFilter()

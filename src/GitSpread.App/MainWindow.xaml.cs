@@ -11,7 +11,14 @@ public partial class MainWindow : Window
 {
     public static readonly RoutedCommand AddAccountCommand = new(nameof(AddAccountCommand), typeof(MainWindow));
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        // Taille de base 1400 × 860, ramenée à l'écran s'il est plus petit.
+        var area = SystemParameters.WorkArea;
+        Width = Math.Min(Width, area.Width - 20);
+        Height = Math.Min(Height, area.Height - 20);
+    }
 
     private MainViewModel ViewModel => (MainViewModel)DataContext;
 

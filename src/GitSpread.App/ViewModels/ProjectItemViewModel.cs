@@ -99,6 +99,9 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     [ObservableProperty] public partial string IdentityLabel { get; set; } = "";
 
     public bool HasDetailsError => DetailsError is not null;
+
+    /// <summary>L'état du projet vient d'être relu (après la sélection ou une action) : l'aperçu de l'historique suit.</summary>
+    public event EventHandler? DetailsLoaded;
     partial void OnDetailsErrorChanged(string? value) => OnPropertyChanged(nameof(HasDetailsError));
 
     public async Task LoadDetailsAsync()
@@ -152,6 +155,7 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
             await LoadBranchStateAsync();
             await LoadLinksAsync(status.IsDetached ? null : status.Branch);
             HasDetails = true;
+            DetailsLoaded?.Invoke(this, EventArgs.Empty);
             _ = LoadIdentitySafeAsync(); // profils GitHub : chargés sans retarder l'affichage du panneau
         }
         catch (Exception e)
