@@ -193,6 +193,13 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
     private Task DeleteBranchAsync(BranchRowViewModel? branch) =>
         branch is null ? Task.CompletedTask : RunOnProjectAsync(p => p.DeleteBranchAsync(branch.Info, History.DefaultBranch));
 
+    /// <summary>Remet dans le projet la version du fichier affiché, au commit choisi (F6e).</summary>
+    [RelayCommand]
+    private Task RestoreFileAsync() =>
+        History is { SelectedRow: { } row, ViewedPath: { } file, CanRestoreFile: true }
+            ? RunOnProjectAsync(p => p.RestoreFileAsync(row.Commit.Sha, row.ShortSha, row.DateTooltip, file))
+            : Task.CompletedTask;
+
     /// <summary>Nouvelle branche à partir du commit choisi dans l'historique.</summary>
     [RelayCommand]
     private Task CreateBranchHereAsync() =>

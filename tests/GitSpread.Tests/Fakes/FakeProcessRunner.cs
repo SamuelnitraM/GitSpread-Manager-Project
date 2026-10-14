@@ -25,6 +25,11 @@ public sealed class FakeProcessRunner : IProcessRunner
             .Select(r => r.Result)
             .FirstOrDefault();
         if (match is null) throw new InvalidOperationException($"Aucune réponse simulée pour : {request.CommandLine}");
+        if (request.StandardOutputPath is { } file)
+        {
+            File.WriteAllText(file, match.StandardOutput);
+            return Task.FromResult(match with { StandardOutput = "" });
+        }
         if (match.StandardError.Length > 0) request.OutputReceived?.Invoke(match.StandardError);
         if (match.StandardOutput.Length > 0) request.OutputReceived?.Invoke(match.StandardOutput);
         return Task.FromResult(match);

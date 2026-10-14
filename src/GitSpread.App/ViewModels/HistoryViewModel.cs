@@ -13,8 +13,11 @@ namespace GitSpread.App.ViewModels;
 public sealed record RefPill(string Name, BranchColor Color, bool IsRemote, bool IsTag, bool IsHead);
 
 /// <summary>Une ligne de l'historique : le dessin du graphe et le commit.</summary>
-public sealed class HistoryRowViewModel(HistoryCommit commit, GraphRow graph, IReadOnlyList<RefPill> refs)
+public sealed partial class HistoryRowViewModel(HistoryCommit commit, GraphRow graph, IReadOnlyList<RefPill> refs) : ObservableObject
 {
+    /// <summary>Estompé : ne correspond pas à la recherche en cours (F6e).</summary>
+    [ObservableProperty] public partial bool IsDimmed { get; set; }
+
     public HistoryCommit Commit { get; } = commit;
     public GraphRow Graph { get; } = graph;
     public IReadOnlyList<RefPill> Refs { get; } = refs;
@@ -299,6 +302,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
                 StateOf(b), _defaultBranch));
 
         SelectedRow = Rows.FirstOrDefault(r => r.Commit.Sha == keepSha) ?? (WithDetails ? Rows.FirstOrDefault() : null);
+        ApplySearch(selectFirst: false);
         RaiseLists();
     }
 
@@ -360,8 +364,16 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     public ObservableCollection<DiffLine> Diff { get; } = [];
     public bool HasDetails => Details is not null;
     public bool HasNoFiles => Details is not null && Files.Count == 0;
-    public string FilesHeader => $"FICHIERS MODIFIÉS ({Files.Count})";
-    public string DiffHeader => SelectedFile is { } f ? $"MODIFICATIONS · {f.Path}" : "MODIFICATIONS";
+    public string FilesHeader => ShowAllFiles
+        ? (_allFiles.Count > 0 ? $"TOUS LES FICHIERS ({_allFiles.Count})" : "TOUS LES FICHIERS")
+        : $"FICHIERS MODIFIÉS ({Files.Count})";
+    /// <summary>Titre de la visionneuse : modifications du fichier, ou son contenu à ce commit (F6e).</summary>
+    public string DiffHeader => (ViewMode, ViewedPath) switch
+    {
+        (FileViewMode.Content, { } path) => $"CONTENU À CE COMMIT · {path}",
+        (_, { } path) => $"MODIFICATIONS · {path}",
+        _ => "MODIFICATIONS",
+    };
     public string FilesLabel => Details is null ? "" : Files.Count switch
     {
         0 => "Aucun fichier modifié (commit vide ou fusion sans changement).",
@@ -382,10 +394,17 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     partial void OnDetailsChanged(CommitDetails? value)
     {
         foreach (var p in new[] { nameof(HasDetails), nameof(FilesLabel), nameof(AuthorLabel), nameof(DateLabel), nameof(ParentsLabel),
-                     nameof(HasNoFiles), nameof(FilesHeader) }) OnPropertyChanged(p);
+                     nameof(HasNoFiles), nameof(FilesHeader), nameof(NoChangedFilesShown) }) OnPropertyChanged(p);
     }
     partial void OnSelectedFileChanged(CommitFile? value)
     {
+        _contentVersion++; // un contenu en cours de lecture ne doit plus rien afficher
+        ContentLines.Clear();
+        ImagePath = null;
+        ContentNote = null;
+        FileStatus = null;
+        ViewedPath = value?.Path;
+        ViewMode = FileViewMode.Changes;
         OnPropertyChanged(nameof(DiffHeader));
         _ = LoadDiffAsync(value);
     }
@@ -399,7 +418,9 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         {
             Details = null;
             Files.Clear();
+            SelectedFile = null;
             Diff.Clear();
+            ResetFiles(null, version);
             return;
         }
         try
@@ -409,6 +430,9 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
             Files.Clear();
             foreach (var f in details.Files) Files.Add(f);
             Details = details;
+            ResetFiles(details, version);
+            // Remis à zéro d'abord : deux commits peuvent avoir le même premier fichier (même modification), à relire quand même.
+            SelectedFile = null;
             SelectedFile = Files.FirstOrDefault();
             if (SelectedFile is null) Diff.Clear();
         }

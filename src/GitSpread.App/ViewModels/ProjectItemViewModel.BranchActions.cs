@@ -163,4 +163,28 @@ public sealed partial class ProjectItemViewModel
             return ActionLog.From(title, steps, $"La branche « {name} » est supprimée {where}.");
         });
     }
+
+    /// <summary>
+    /// Remet dans le projet la version d'un fichier à un commit (F6e). Seul le fichier sur le disque change : la restauration
+    /// apparaît comme un changement normal, à commiter. Refusé si le fichier a des changements pas encore commités.
+    /// </summary>
+    public async Task RestoreFileAsync(string sha, string shortSha, string when, string file)
+    {
+        if (await Git.HasUncommittedChangesAsync(Path, file))
+        {
+            LastAction = ActionLog.Failure("Restaurer un fichier",
+                $"« {file} » a des changements pas encore commités : commite-les (ou annule-les) d'abord, pour ne rien perdre. "
+                + "Tu peux aussi utiliser « Enregistrer cette version sous… » pour récupérer l'ancienne version ailleurs.");
+            return;
+        }
+        if (!host.Dialogs.Confirm(
+                $"Remettre « {file} » comme il était au commit {shortSha} ({when}) ?\n\n"
+                + "Le fichier du projet est remplacé par cette version. L'historique n'est pas modifié : la restauration "
+                + "apparaîtra comme un changement à commiter, que tu pourras aussi annuler.",
+                "Restaurer cette version"))
+            return;
+        await RunAsync("Restaurer un fichier", async () =>
+            ActionLog.From("Restaurer un fichier", [await Git.RestoreFileAsync(Path, sha, file)],
+                $"« {file} » a retrouvé sa version du commit {shortSha}. Commite-le si elle te convient."));
+    }
 }

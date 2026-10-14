@@ -23,6 +23,12 @@ public partial class HistoryView : UserControl
 
     private void OnThemeChanged(object? sender, EventArgs e) => Commits.Items.Refresh();
 
+    // Commit choisi ailleurs (recherche, onglet « Branches ») : on le fait apparaître dans la liste.
+    private void Commits_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Commits.SelectedItem is { } row) Commits.ScrollIntoView(row);
+    }
+
     // Dans l'aperçu, un double-clic ouvre la grande fenêtre sur ce commit.
     private void Commits_DoubleClick(object sender, MouseButtonEventArgs e)
     {

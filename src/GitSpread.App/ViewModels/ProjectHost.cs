@@ -65,6 +65,9 @@ public interface IDialogService
     /// <summary>Saisie d'un texte court : null si annulé. <paramref name="validate"/> renvoie le message d'erreur
     /// affiché sous le champ (la fenêtre reste ouverte tant qu'il y en a un).</summary>
     string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false);
+
+    /// <summary>Emplacement où enregistrer un fichier : chemin choisi, ou null si annulé.</summary>
+    string? AskSavePath(string title, string fileName);
 }
 
 /// <summary>Compte rendu de la dernière action lancée sur un projet : commandes, résultat en clair, sortie brute.</summary>

@@ -48,6 +48,9 @@ public sealed class PanelSections : ObservableObject
     public bool HistoryFiles { get => Get(); set => Set(value); }
     public bool HistoryDiff { get => Get(); set => Set(value); }
 
+    /// <summary>Fichiers du commit : tous les fichiers du projet (vrai) ou seulement les modifiés (F6e).</summary>
+    public bool HistoryAllFiles { get => Get(defaultOpen: false); set => Set(value); }
+
     // Parties de sections qui peuvent devenir longues
     public bool LinkRows { get => Get(); set => Set(value); }
     public bool OtherBranches { get => Get(); set => Set(value); }

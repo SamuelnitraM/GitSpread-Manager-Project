@@ -185,6 +185,35 @@
                 </Button>
                 <TextBlock Text="{Binding Title}" Style="{StaticResource PanelTitle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             </DockPanel>
+            <!-- Recherche dans l'historique chargé (F6e) -->
+            <StackPanel DockPanel.Dock="Top" Margin="14,0,10,6">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="4,0,0,0"
+                                Visibility="{Binding HasSearch, Converter={StaticResource BoolToVisibility}}">
+                        <Button Style="{StaticResource GhostButton}" Command="{Binding PreviousMatchCommand}" AutomationProperties.Name="Résultat précédent" ToolTip="Résultat précédent (plus récent)">
+                            <TextBlock Text="&#xE70E;" Style="{StaticResource Glyph}" FontSize="11" />
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Command="{Binding NextMatchCommand}" AutomationProperties.Name="Résultat suivant" ToolTip="Résultat suivant (plus ancien)">
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="11" />
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Command="{Binding ClearSearchCommand}" AutomationProperties.Name="Effacer la recherche" ToolTip="Effacer la recherche">
+                            <TextBlock Text="&#xE711;" Style="{StaticResource Glyph}" FontSize="11" />
+                        </Button>
+                    </StackPanel>
+                    <Grid>
+                        <TextBox x:Name="SearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=250}" Padding="26,4,6,4"
+                                 AutomationProperties.Name="Rechercher dans l historique" KeyDown="Search_KeyDown"
+                                 ToolTip="Message, auteur, SHA, branche ou tag. Entrée : résultat suivant, Maj+Entrée : précédent." />
+                        <TextBlock Text="&#xE721;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource Muted}" Margin="8,0,0,0"
+                                   VerticalAlignment="Center" HorizontalAlignment="Left" IsHitTestVisible="False" />
+                        <TextBlock Text="Rechercher un commit (message, auteur, SHA, branche)" Foreground="{DynamicResource Muted}" Margin="28,0,0,0"
+                                   VerticalAlignment="Center" IsHitTestVisible="False"
+                                   Visibility="{Binding HasSearch, Converter={StaticResource InverseBoolToVisibility}}" />
+                    </Grid>
+                </DockPanel>
+                <TextBlock Text="{Binding SearchSummary}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="2,4,0,0" TextWrapping="Wrap"
+                           Visibility="{Binding HasSearch, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
             <views:HistoryView ShowLegend="True" />
         </DockPanel>
         <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="{DynamicResource Border}" />
@@ -238,9 +267,23 @@
                     <Expander Style="{StaticResource Section}" Header="{Binding FilesHeader}"
                               IsExpanded="{Binding DataContext.Sections.HistoryFiles, RelativeSource={RelativeSource AncestorType=UserControl}}">
                     <StackPanel>
+                        <!-- F6e : seulement les fichiers modifiés par ce commit, ou tout le projet tel qu'il était à ce commit -->
+                        <Border Background="{DynamicResource SegmentBg}" CornerRadius="8" Padding="3" HorizontalAlignment="Left" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowChangedFiles}" AutomationProperties.Name="Fichiers modifiés par ce commit"
+                                             ToolTip="Seulement les fichiers ajoutés, modifiés, renommés ou supprimés par ce commit">
+                                    <TextBlock Text="{Binding ChangedTabLabel}" />
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding ShowAllFiles}" AutomationProperties.Name="Tous les fichiers du projet à ce commit"
+                                             ToolTip="Tout le projet tel qu'il était à ce commit">
+                                    <TextBlock Text="{Binding AllTabLabel}" />
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
                         <TextBlock Text="{Binding FilesLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
-                                   Visibility="{Binding HasNoFiles, Converter={StaticResource BoolToVisibility}}" />
-                        <ListBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="190" PreviewMouseWheel="Nested_PreviewMouseWheel" BorderThickness="1" BorderBrush="{DynamicResource Border}"
+                                   Visibility="{Binding NoChangedFilesShown, Converter={StaticResource BoolToVisibility}}" />
+                        <ListBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="190"
+                                 Visibility="{Binding ShowChangedFiles, Converter={StaticResource BoolToVisibility}}" PreviewMouseWheel="Nested_PreviewMouseWheel" BorderThickness="1" BorderBrush="{DynamicResource Border}"
                                  Background="Transparent" HorizontalContentAlignment="Stretch" AutomationProperties.Name="Fichiers modifiés">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type git:CommitFile}">
@@ -279,14 +322,106 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+
+                        <!-- Arborescence complète au commit choisi (F6e) : les dossiers se construisent à l'ouverture -->
+                        <StackPanel Visibility="{Binding ShowAllFiles, Converter={StaticResource BoolToVisibility}}">
+                            <Grid Margin="0,0,0,6">
+                                <TextBox Text="{Binding TreeFilter, UpdateSourceTrigger=PropertyChanged, Delay=250}" Padding="26,4,6,4"
+                                         AutomationProperties.Name="Filtrer les fichiers" ToolTip="Partie du nom ou du chemin d'un fichier" />
+                                <TextBlock Text="&#xE71C;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource Muted}" Margin="8,0,0,0"
+                                           VerticalAlignment="Center" HorizontalAlignment="Left" IsHitTestVisible="False" />
+                                <TextBlock Text="Filtrer les fichiers (nom ou chemin)" Foreground="{DynamicResource Muted}" Margin="28,0,0,0"
+                                           VerticalAlignment="Center" IsHitTestVisible="False"
+                                           Visibility="{Binding HasTreeFilter, Converter={StaticResource InverseBoolToVisibility}}" />
+                            </Grid>
+                            <TextBlock Text="Lecture des fichiers…" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,0,4"
+                                       Visibility="{Binding IsLoadingTree, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Text="{Binding TreeNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                       Visibility="{Binding HasTreeNote, Converter={StaticResource BoolToVisibility}}" />
+                            <TreeView ItemsSource="{Binding Tree}" MaxHeight="260" PreviewMouseWheel="Nested_PreviewMouseWheel" SelectedItemChanged="Tree_SelectedItemChanged"
+                                      BorderThickness="1" BorderBrush="{DynamicResource Border}" Background="Transparent"
+                                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                      AutomationProperties.Name="Fichiers du projet à ce commit">
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate DataType="{x:Type vm:FileTreeNode}" ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="Icon" Text="&#xE7C3;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource Muted}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <Border x:Name="Badge" Width="18" CornerRadius="4" Margin="0,0,6,0" Background="{DynamicResource AccentSoft}" Visibility="Collapsed">
+                                                <TextBlock x:Name="Letter" Text="{Binding StatusLetter}" FontFamily="Consolas" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center"
+                                                           Foreground="{DynamicResource Accent}" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <HierarchicalDataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                                <Setter TargetName="Icon" Property="Text" Value="&#xE8B7;" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding HasChange}" Value="True">
+                                                <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
+                                                <Setter TargetName="Icon" Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLetter}" Value="A">
+                                                <Setter TargetName="Badge" Property="Background" Value="{DynamicResource SuccessSoft}" />
+                                                <Setter TargetName="Letter" Property="Foreground" Value="{DynamicResource Success}" />
+                                                <Setter TargetName="Badge" Property="ToolTip" Value="Ajouté par ce commit" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLetter}" Value="R">
+                                                <Setter TargetName="Badge" Property="Background" Value="{DynamicResource WarningSoft}" />
+                                                <Setter TargetName="Letter" Property="Foreground" Value="{DynamicResource Warning}" />
+                                                <Setter TargetName="Badge" Property="ToolTip" Value="Renommé ou déplacé par ce commit" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusLetter}" Value="M">
+                                                <Setter TargetName="Badge" Property="ToolTip" Value="Modifié par ce commit" />
+                                            </DataTrigger>
+                                        </HierarchicalDataTemplate.Triggers>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </StackPanel>
                     </StackPanel>
                     </Expander>
                     <Expander Style="{StaticResource Section}" Header="{Binding DiffHeader}"
                               IsExpanded="{Binding DataContext.Sections.HistoryDiff, RelativeSource={RelativeSource AncestorType=UserControl}}">
 
                     <!-- Diff : lignes ajoutées en vert, retirées en rouge. Il occupe la hauteur visible de la colonne et défile lui-même. -->
-                    <Grid Height="{Binding ViewportHeight, ElementName=DetailsScroll}" MinHeight="220">
-                        <ListBox ItemsSource="{Binding Diff}" BorderThickness="1" BorderBrush="{DynamicResource Border}" Background="{DynamicResource Bg}"
+                    <DockPanel Height="{Binding ViewportHeight, ElementName=DetailsScroll}" MinHeight="220">
+                    <StackPanel DockPanel.Dock="Top" Visibility="{Binding ViewedPath, Converter={StaticResource NullToCollapsed}}">
+                        <WrapPanel Margin="0,0,0,4">
+                            <WrapPanel.Resources>
+                                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                    <Setter Property="FontSize" Value="12" />
+                                    <Setter Property="Margin" Value="0,0,4,2" />
+                                </Style>
+                            </WrapPanel.Resources>
+                            <Button Content="Voir le fichier entier" Command="{Binding ShowWholeFileCommand}"
+                                    Visibility="{Binding CanShowWholeFile, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Le fichier complet tel qu'il était à ce commit" />
+                            <Button Content="Voir les modifications" Command="{Binding ShowChangesCommand}"
+                                    Visibility="{Binding CanShowChanges, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Ce que ce commit a changé dans ce fichier (en vert et rouge)" />
+                            <Button Content="Copier le chemin" Command="{Binding CopyPathCommand}" />
+                            <Button Content="Enregistrer cette version sous…" Command="{Binding SaveVersionCommand}"
+                                    Visibility="{Binding ViewedFileExists, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Écrit une copie de ce fichier, tel qu'il était à ce commit, où tu veux. Le projet n'est pas touché." />
+                            <Button Content="Restaurer dans le projet…" Command="{Binding DataContext.RestoreFileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    IsEnabled="{Binding DataContext.CanAct, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    Visibility="{Binding CanRestoreFile, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Remet ce fichier comme il était à ce commit. L'historique ne change pas : la restauration sera un changement à commiter." />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding FileStatus}" Foreground="{DynamicResource Success}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Visibility="{Binding FileStatus, Converter={StaticResource NullToCollapsed}}" />
+                        <TextBlock Text="{Binding ContentNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Visibility="{Binding ContentNoteShown, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                    <Grid>
+                        <ListBox ItemsSource="{Binding Diff}" Visibility="{Binding IsShowingChanges, Converter={StaticResource BoolToVisibility}}" BorderThickness="1" BorderBrush="{DynamicResource Border}" Background="{DynamicResource Bg}"
                                  PreviewMouseWheel="Nested_PreviewMouseWheel"
                                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto" AutomationProperties.Name="Modifications du fichier">
@@ -334,7 +469,39 @@
                         </ListBox>
                         <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource Accent}"
                                      Visibility="{Binding IsLoadingDiff, Converter={StaticResource BoolToVisibility}}" />
+
+                        <!-- Contenu du fichier à ce commit (F6e) : texte avec numéros de ligne, ou aperçu d'image -->
+                        <ListBox ItemsSource="{Binding ContentLines}" BorderThickness="1" BorderBrush="{DynamicResource Border}" Background="{DynamicResource Bg}"
+                                 PreviewMouseWheel="Nested_PreviewMouseWheel"
+                                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto" AutomationProperties.Name="Contenu du fichier"
+                                 Visibility="{Binding IsShowingContent, Converter={StaticResource BoolToVisibility}}">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem"><ContentPresenter /></ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:FileLine}">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,6,0">
+                                        <TextBlock Text="{Binding Number}" FontFamily="Consolas" FontSize="12" Width="44" TextAlignment="Right" Margin="0,0,10,0"
+                                                   Foreground="{DynamicResource Muted}" />
+                                        <TextBlock Text="{Binding Text}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource Text}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="12"
+                                Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}">
+                            <Image x:Name="Preview" Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                   Source="{Binding ImagePath, Converter={StaticResource FileToImage}}" AutomationProperties.Name="Aperçu de l image" />
+                        </Border>
                     </Grid>
+                    </DockPanel>
                     </Expander>
                 </StackPanel>
                 </ScrollViewer>

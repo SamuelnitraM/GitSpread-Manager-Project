@@ -45,7 +45,9 @@ public sealed class ProcessRunner(ILogger<ProcessRunner>? logger = null) : IProc
 
         using (process)
         {
-            var stdout = PumpAsync(process.StandardOutput, request.OutputReceived);
+            var stdout = request.StandardOutputPath is { } file
+                ? CopyToFileAsync(process.StandardOutput.BaseStream, file)
+                : PumpAsync(process.StandardOutput, request.OutputReceived);
             var stderr = PumpAsync(process.StandardError, request.OutputReceived);
 
             if (request.StandardInput is not null)
@@ -74,6 +76,13 @@ public sealed class ProcessRunner(ILogger<ProcessRunner>? logger = null) : IProc
                 _logger.LogWarning("stderr : {StdErr}", SecretRedactor.Redact(result.StandardError.Trim()));
             return result;
         }
+    }
+
+    private static async Task<string> CopyToFileAsync(Stream output, string path)
+    {
+        await using (var file = File.Create(path))
+            await output.CopyToAsync(file);
+        return "";
     }
 
     private static async Task<string> PumpAsync(StreamReader reader, Action<string>? onChunk)

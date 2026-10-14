@@ -81,7 +81,7 @@
             <ListBox x:Name="Commits" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" BorderThickness="0" Background="Transparent"
                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
-                     MouseDoubleClick="Commits_DoubleClick" AutomationProperties.Name="Historique des commits">
+                     MouseDoubleClick="Commits_DoubleClick" SelectionChanged="Commits_SelectionChanged" AutomationProperties.Name="Historique des commits">
                 <ListBox.ItemContainerStyle>
                     <!-- Lignes collées les unes aux autres, sans marge : les traits du graphe doivent être continus -->
                     <Style TargetType="ListBoxItem">
@@ -99,6 +99,10 @@
                                         <Trigger Property="IsSelected" Value="True">
                                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
                                         </Trigger>
+                                        <!-- Recherche (F6e) : les commits qui ne correspondent pas sont estompés -->
+                                        <DataTrigger Binding="{Binding IsDimmed}" Value="True">
+                                            <Setter TargetName="Bd" Property="Opacity" Value="0.35" />
+                                        </DataTrigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </Setter.Value>

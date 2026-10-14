@@ -51,6 +51,28 @@ public sealed class InverseBoolToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>Image lue depuis un fichier, chargée en mémoire tout de suite : le fichier n'est pas verrouillé (F6e).</summary>
+public sealed class FileToImageConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not string path || !System.IO.File.Exists(path)) return null;
+        try
+        {
+            // Une icône contient plusieurs tailles : on montre la plus grande.
+            var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(new Uri(path),
+                System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+            var image = decoder.Frames.MaxBy(f => f.PixelWidth)!;
+            image.Freeze();
+            return image;
+        }
+        catch (Exception e) when (e is NotSupportedException or System.IO.IOException or ArgumentException) { return null; } // image illisible
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Masqué quand la valeur est null (ou une chaîne vide).</summary>
 public sealed class NullToCollapsedConverter : IValueConverter
 {

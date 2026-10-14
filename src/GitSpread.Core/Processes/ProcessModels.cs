@@ -6,6 +6,10 @@ public sealed record ProcessRequest(string FileName, IReadOnlyList<string> Argum
     public string? WorkingDirectory { get; init; }
     public IReadOnlyDictionary<string, string>? Environment { get; init; }
     public string? StandardInput { get; init; }
+
+    /// <summary>Si renseigné, la sortie standard est écrite telle quelle (octets, binaire compris) dans ce fichier
+    /// au lieu d'être lue comme du texte.</summary>
+    public string? StandardOutputPath { get; init; }
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(60);
 
     /// <summary>Appelé (sur un thread d'arrière-plan) à chaque morceau de sortie, stdout ou stderr, au fil de l'eau.</summary>

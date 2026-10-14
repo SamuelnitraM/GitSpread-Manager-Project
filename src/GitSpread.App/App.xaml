@@ -16,6 +16,7 @@
             <app:EnumToBoolConverter x:Key="EnumToBool" />
             <app:NotConverter x:Key="Not" />
             <app:NullToCollapsedConverter x:Key="NullToCollapsed" />
+            <app:FileToImageConverter x:Key="FileToImage" />
             <app:BranchColorToBrushConverter x:Key="BranchBrush" />
 
             <!-- Petite pastille (actif, privé, archivé...) -->

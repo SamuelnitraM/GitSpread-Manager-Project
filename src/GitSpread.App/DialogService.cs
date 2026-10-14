@@ -36,4 +36,15 @@ public sealed class DialogService : IDialogService
 
     public string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false) =>
         SmallDialogs.Prompt(Owner, title, message, initialValue, validate, spacesToDash);
+
+    public string? AskSavePath(string title, string fileName)
+    {
+        var extension = System.IO.Path.GetExtension(fileName);
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = title, FileName = fileName,
+            Filter = extension.Length > 0 ? $"Fichier {extension}|*{extension}|Tous les fichiers|*.*" : "Tous les fichiers|*.*",
+        };
+        return dialog.ShowDialog(Owner) == true ? dialog.FileName : null;
+    }
 }

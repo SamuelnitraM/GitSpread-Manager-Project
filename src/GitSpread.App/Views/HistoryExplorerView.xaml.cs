@@ -17,6 +17,30 @@ public partial class HistoryExplorerView : UserControl
             vm.History.SelectBranchCommand.Execute(branch);
     }
 
+    // Arborescence des fichiers (F6e) : le TreeView ne permet pas de lier l'élément choisi, on le transmet ici.
+    private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (DataContext is HistoryExplorerViewModel vm) vm.History.SelectedNode = e.NewValue as FileTreeNode;
+    }
+
+    // Recherche : Entrée passe au résultat suivant, Maj+Entrée au précédent, Échap efface.
+    private void Search_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (DataContext is not HistoryExplorerViewModel { History: var history }) return;
+        if (e.Key == Key.Enter)
+        {
+            SearchBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource(); // sans attendre le délai de frappe
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) history.PreviousMatchCommand.Execute(null);
+            else history.NextMatchCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && history.HasSearch)
+        {
+            history.ClearSearchCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     /// <summary>
     /// Fichiers modifiés et modifications défilent d'abord eux-mêmes ; arrivés en haut ou en bas,
     /// la molette fait défiler toute la colonne de droite (sinon elle resterait « bloquée » dans la liste).

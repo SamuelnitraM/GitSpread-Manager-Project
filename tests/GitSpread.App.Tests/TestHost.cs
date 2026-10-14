@@ -111,6 +111,10 @@ public sealed class TestHost : IProjectHost, IDialogService
     public List<string> PromptErrors { get; } = [];
     public int ChooseAnswer { get; set; } = -1;
 
+    /// <summary>Emplacement renvoyé par « Enregistrer sous » (null = annuler).</summary>
+    public string? SavePath { get; set; }
+    public string? AskSavePath(string title, string fileName) => SavePath;
+
     public int Choose(string title, string message, IReadOnlyList<string> options) => ChooseAnswer;
 
     public string? Prompt(string title, string message, string initialValue, Func<string, string?>? validate = null, bool spacesToDash = false)
