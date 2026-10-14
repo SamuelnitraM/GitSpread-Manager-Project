@@ -39,11 +39,12 @@ public sealed class LinkedProjects(GitService git, GitCredentialResolver credent
         git.RemoveRemoteAsync(project.Path, Target(project, fullName).Name, ct);
 
     /// <summary>
-    /// La branche par défaut a été renommée sur GitHub (ex. master → main) : récupère la nouvelle, renomme la branche
-    /// locale si elle existe, la relie à sa nouvelle version distante et met à jour la branche par défaut connue.
+    /// Une branche a été renommée sur GitHub (ex. master → main) : récupère la nouvelle, renomme la branche
+    /// locale si elle existe et la relie à sa nouvelle version distante. Pour la branche par défaut
+    /// (<paramref name="isDefault"/>), met aussi à jour la branche principale connue de git.
     /// </summary>
     public async Task<IReadOnlyList<GitResult>> FollowBranchRenameAsync(LocalProject project, GitHubAccount? account, string from, string to,
-        string? fullName = null, CancellationToken ct = default)
+        string? fullName = null, bool isDefault = true, CancellationToken ct = default)
     {
         var target = Target(project, fullName);
         var remote = target.Name;
@@ -51,11 +52,12 @@ public sealed class LinkedProjects(GitService git, GitCredentialResolver credent
         var auth = await credentials.EnvironmentForAsync(account, target.Url, ct);
         steps.Add(await git.FetchAsync(project.Path, remote, auth, ct));
         if (!steps[^1].Succeeded) return steps;
+        if (await git.ForgetRemoteBranchAsync(project.Path, remote, from, ct) is { } forgotten) steps.Add(forgotten); // l'ancien nom n'existe plus sur GitHub
 
         // Lien secondaire : les branches locales suivent le lien principal, on ne fait que mettre à jour ce que sait git du repo.
         if (remote != (project.RemoteName ?? "origin"))
         {
-            steps.Add(await git.SetRemoteHeadAsync(project.Path, remote, to, ct));
+            if (isDefault) steps.Add(await git.SetRemoteHeadAsync(project.Path, remote, to, ct));
             return steps;
         }
 
@@ -67,7 +69,7 @@ public sealed class LinkedProjects(GitService git, GitCredentialResolver credent
         }
         if ((await git.ListBranchesAsync(project.Path, ct)).Any(b => b.IsLocal && b.Name == to))
             steps.Add(await git.SetUpstreamAsync(project.Path, to, $"{remote}/{to}", ct));
-        steps.Add(await git.SetRemoteHeadAsync(project.Path, remote, to, ct));
+        if (isDefault) steps.Add(await git.SetRemoteHeadAsync(project.Path, remote, to, ct));
         return steps;
     }
 }

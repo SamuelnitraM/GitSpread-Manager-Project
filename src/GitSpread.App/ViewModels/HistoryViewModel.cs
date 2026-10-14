@@ -26,9 +26,10 @@ public sealed class HistoryRowViewModel(HistoryCommit commit, GraphRow graph, IR
 }
 
 /// <summary>Une branche de l'onglet « Branches » : sa couleur, son dernier commit et sa situation en clair.</summary>
-public sealed class BranchRowViewModel(BranchOverview overview, BranchColor color, string state)
+public sealed class BranchRowViewModel(BranchOverview overview, BranchColor color, string state, string? defaultBranch = null)
 {
     public BranchOverview Overview { get; } = overview;
+    public BranchInfo Info => Overview.Info;
     public BranchColor Color { get; } = color;
     public string Name => Overview.Name;
     public string StateLabel { get; } = state;
@@ -36,6 +37,17 @@ public sealed class BranchRowViewModel(BranchOverview overview, BranchColor colo
     public string DateLabel => Overview.Date is { } d ? RepositoryItemViewModel.Relative(d) : "";
     public bool IsCurrent => Overview.Info.IsCurrent;
     public bool IsRemoteOnly => Overview.Info.IsRemoteOnly;
+    public string? DefaultBranch { get; } = defaultBranch;
+
+    // ------------------------------------------------------------ actions possibles (F6b)
+
+    public bool CanSwitch => !IsCurrent;
+    public string SwitchLabel => IsRemoteOnly ? "Récupérer et basculer ici" : "Basculer ici";
+    public bool CanIntegrate => !Overview.IsDefault && Overview.NotInDefault > 0 && DefaultBranch is not null;
+    public string IntegrateLabel => $"Intégrer dans {DefaultBranch}";
+    public bool CanPush => Info.IsLocal && (Info.Upstream is null || Info.Ahead > 0);
+    public string PushLabel => Info.Upstream is null ? "Envoyer sur GitHub" : $"Pousser ({Info.Ahead})";
+    public bool CanDelete => !Overview.IsDefault && !IsCurrent;
     public override string ToString() => Name;
 }
 
@@ -69,6 +81,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     [ObservableProperty] public partial HistoryRowViewModel? SelectedRow { get; set; }
 
     public string Title => Project?.Name ?? "Historique";
+    public string? DefaultBranch => _defaultBranch;
     public string Summary => Project is null || Rows.Count == 0 ? ""
         : $"{Branches.Count} branche{(Branches.Count > 1 ? "s" : "")} · {Rows.Count}{(HasMore ? "+" : "")} commit{(Rows.Count > 1 ? "s" : "")}";
     public bool HasMessage => Message is not null;
@@ -213,7 +226,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         Branches.Clear();
         foreach (var b in _branches)
             Branches.Add(new BranchRowViewModel(b, layout.BranchColors.TryGetValue(b.Name, out var color) ? color : new BranchColor(BranchKind.Classic, -1),
-                StateOf(b)));
+                StateOf(b), _defaultBranch));
 
         SelectedRow = Rows.FirstOrDefault(r => r.Commit.Sha == keepSha) ?? (WithDetails ? Rows.FirstOrDefault() : null);
         RaiseLists();

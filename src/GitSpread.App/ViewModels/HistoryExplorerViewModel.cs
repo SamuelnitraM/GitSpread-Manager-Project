@@ -60,7 +60,10 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
     partial void OnSelectedItemChanged(ExplorerItem? value)
     {
         OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(CanAct));
         if (value is null || _quiet) return;
+        if (!value.Key.Equals(_shownKey, StringComparison.OrdinalIgnoreCase)) LastAction = null; // compte rendu d'un autre projet
+        _shownKey = value.Key;
         var sha = _initialKey is not null && value.Key.Equals(_initialKey, StringComparison.OrdinalIgnoreCase) ? _initialSha : null;
         _initialKey = null;
         _ = ShowAsync(value, sha);
@@ -121,6 +124,7 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
     }
 
     private bool _quiet;
+    private string? _shownKey;
     private void SetSelectionQuietly(ExplorerItem item)
     {
         _quiet = true;
@@ -130,4 +134,58 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
 
     [RelayCommand]
     private void Close() => _tab.CloseExplorer();
+
+    // ------------------------------------------------------------ actions sur les branches (F6b)
+
+    [ObservableProperty] public partial bool IsBusy { get; set; }
+    [ObservableProperty] public partial ActionLog? LastAction { get; set; }
+    public bool HasLastAction => LastAction is not null;
+
+    /// <summary>Les actions ne concernent que les projets suivis par git sur ce poste.</summary>
+    public bool CanAct => SelectedItem?.Project is { IsRepository: true } && !IsBusy;
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanAct));
+    partial void OnLastActionChanged(ActionLog? value) => OnPropertyChanged(nameof(HasLastAction));
+
+    /// <summary>Lance une action du projet choisi, montre son compte rendu, puis relit l'historique.</summary>
+    private async Task RunOnProjectAsync(Func<ProjectItemViewModel, Task> action)
+    {
+        if (SelectedItem?.Project is not { IsRepository: true } project || IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            await project.EnsureDetailsAsync();
+            project.LastAction = null;
+            await action(project);
+            if (project.LastAction is { } log) LastAction = log; // rien si l'action a été annulée
+        }
+        finally { IsBusy = false; }
+        await History.ReloadCommand.ExecuteAsync(null);
+    }
+
+    [RelayCommand]
+    private Task SwitchBranchAsync(BranchRowViewModel? branch) =>
+        branch is null ? Task.CompletedTask : RunOnProjectAsync(p => p.SwitchToBranchAsync(branch.Info));
+
+    [RelayCommand]
+    private Task IntegrateBranchAsync(BranchRowViewModel? branch) =>
+        branch?.DefaultBranch is not { } main ? Task.CompletedTask : RunOnProjectAsync(p => p.IntegrateAsync(branch.Name, main));
+
+    [RelayCommand]
+    private Task PushBranchAsync(BranchRowViewModel? branch) =>
+        branch is null ? Task.CompletedTask : RunOnProjectAsync(p => p.PushBranchAsync(branch.Info));
+
+    [RelayCommand]
+    private Task RenameBranchAsync(BranchRowViewModel? branch) =>
+        branch is null ? Task.CompletedTask
+            : RunOnProjectAsync(p => p.RenameBranchAsync(branch.Info, History.Branches.Select(b => b.Name).ToList(), History.DefaultBranch));
+
+    [RelayCommand]
+    private Task DeleteBranchAsync(BranchRowViewModel? branch) =>
+        branch is null ? Task.CompletedTask : RunOnProjectAsync(p => p.DeleteBranchAsync(branch.Info, History.DefaultBranch));
+
+    /// <summary>Nouvelle branche à partir du commit choisi dans l'historique.</summary>
+    [RelayCommand]
+    private Task CreateBranchHereAsync() =>
+        History.SelectedRow is not { } row ? Task.CompletedTask : RunOnProjectAsync(p => p.CreateBranchFromAsync(row.Commit.Sha, row.ShortSha));
 }

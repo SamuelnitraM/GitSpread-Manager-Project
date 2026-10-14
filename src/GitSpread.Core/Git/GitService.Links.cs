@@ -18,6 +18,10 @@ public sealed partial class GitService
         return new RemoteBranchState(true, ahead, behind);
     }
 
+    /// <summary>La branche est connue sur ce lien (d'après le dernier fetch), qu'elle existe ou non sur ce poste.</summary>
+    public async Task<bool> RemoteBranchExistsAsync(string repositoryPath, string remote, string branch, CancellationToken ct = default) =>
+        (await RunAsync(repositoryPath, ["rev-parse", "--verify", "--quiet", $"refs/remotes/{remote}/{branch}"], null, ct)).Succeeded;
+
     public Task<GitResult> UnsetUpstreamAsync(string repositoryPath, string branch, CancellationToken ct = default) =>
         ActAsync(repositoryPath, ["branch", "--unset-upstream", branch], null, ct);
 

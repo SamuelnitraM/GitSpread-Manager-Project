@@ -22,14 +22,41 @@
 
     <DockPanel>
     <Border DockPanel.Dock="Top" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,0,1" Padding="10,6">
-        <StackPanel Orientation="Horizontal">
-            <Button Style="{StaticResource SecondaryButton}" Command="{Binding CloseCommand}" AutomationProperties.Name="Retour aux projets"
-                    ToolTip="Revenir à la liste des projets de cet onglet">
-                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72B;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Retour aux projets" /></StackPanel>
-            </Button>
-            <TextBlock Text="&#xE81C;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="16,0,8,0" VerticalAlignment="Center" />
-            <TextBlock Text="Historique" FontWeight="SemiBold" VerticalAlignment="Center" />
-        </StackPanel>
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button Style="{StaticResource SecondaryButton}" Command="{Binding CloseCommand}" AutomationProperties.Name="Retour aux projets"
+                        ToolTip="Revenir à la liste des projets de cet onglet">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72B;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Retour aux projets" /></StackPanel>
+                </Button>
+                <TextBlock Text="&#xE81C;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="16,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="Historique" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0" />
+                <ProgressBar IsIndeterminate="True" Width="60" Height="3" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource Accent}"
+                             VerticalAlignment="Center" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+
+            <!-- Compte rendu de la dernière action sur une branche (F6b) -->
+            <Border HorizontalAlignment="Right" CornerRadius="6" Padding="10,4" BorderThickness="1" MaxWidth="760"
+                    Visibility="{Binding HasLastAction, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding LastAction.Commands}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource DangerSoft}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource DangerBorder}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding LastAction.Succeeded}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource SuccessSoft}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource SuccessBorder}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="{Binding LastAction.Icon}" Style="{StaticResource Glyph}" Margin="0,2,8,0" VerticalAlignment="Top" />
+                    <TextBlock TextWrapping="Wrap" AutomationProperties.Name="Compte rendu">
+                        <Run Text="{Binding LastAction.Title, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding LastAction.Message, Mode=OneWay}" />
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+        </DockPanel>
     </Border>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -101,6 +128,32 @@
                                         </DockPanel>
                                         <TextBlock Text="{Binding StateLabel}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Text}" Opacity="0.85" />
                                         <TextBlock Text="{Binding LastCommit}" FontSize="12" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+
+                                        <!-- Actions sur la branche choisie (F6b) -->
+                                        <WrapPanel x:Name="Actions" Margin="-6,4,0,0" Visibility="Collapsed"
+                                                   IsEnabled="{Binding DataContext.CanAct, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                            <WrapPanel.Resources>
+                                                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                                    <Setter Property="FontSize" Value="12" />
+                                                    <Setter Property="CommandParameter" Value="{Binding}" />
+                                                    <Setter Property="AutomationProperties.Name" Value="{Binding Content, RelativeSource={RelativeSource Self}}" />
+                                                </Style>
+                                            </WrapPanel.Resources>
+                                            <Button Content="{Binding SwitchLabel}" Command="{Binding DataContext.SwitchBranchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    Visibility="{Binding CanSwitch, Converter={StaticResource BoolToVisibility}}"
+                                                    ToolTip="Passer sur cette branche : tes fichiers prennent son contenu (tes modifications en cours te sont proposées)" />
+                                            <Button Content="{Binding IntegrateLabel}" Command="{Binding DataContext.IntegrateBranchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    Visibility="{Binding CanIntegrate, Converter={StaticResource BoolToVisibility}}"
+                                                    ToolTip="Ajouter le travail de cette branche dans la branche principale (analyse et confirmation avant)" />
+                                            <Button Content="{Binding PushLabel}" Command="{Binding DataContext.PushBranchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    Visibility="{Binding CanPush, Converter={StaticResource BoolToVisibility}}"
+                                                    ToolTip="Envoyer cette branche sur GitHub (jamais de force)" />
+                                            <Button Content="Renommer…" Command="{Binding DataContext.RenameBranchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    ToolTip="Renommer la branche ici et, si elle y est, sur GitHub" />
+                                            <Button Content="Supprimer…" Command="{Binding DataContext.DeleteBranchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    Visibility="{Binding CanDelete, Converter={StaticResource BoolToVisibility}}" Foreground="{DynamicResource Danger}"
+                                                    ToolTip="Supprimer la branche sur ce poste (et, si tu le choisis, sur GitHub). Tu es prévenu si du travail serait perdu." />
+                                        </WrapPanel>
                                     </StackPanel>
                                 </DockPanel>
                                 <DataTemplate.Triggers>
@@ -110,6 +163,9 @@
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding IsCurrent}" Value="True">
                                         <Setter TargetName="BranchName" Property="FontWeight" Value="Bold" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                        <Setter TargetName="Actions" Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -148,6 +204,13 @@
                             <Run Text="{Binding AuthorLabel, Mode=OneWay}" Foreground="{DynamicResource Text}" /><Run Text=" · " /><Run Text="{Binding DateLabel, Mode=OneWay}" />
                         </TextBlock>
                         <TextBox Text="{Binding Details.Commit.Sha, Mode=OneWay}" Style="{StaticResource SelectableText}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource Muted}" />
+                        <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                Command="{Binding DataContext.CreateBranchHereCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                IsEnabled="{Binding DataContext.CanAct, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                AutomationProperties.Name="Créer une branche à partir de ce commit"
+                                ToolTip="Nouvelle branche qui part de ce commit : utile pour repartir d'une version précédente sans toucher aux autres branches">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Créer une branche à partir de ce commit…" /></StackPanel>
+                        </Button>
                         <TextBlock Text="{Binding ParentsLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
 
                         <TextBlock Text="PRÉSENT DANS LES BRANCHES" Style="{StaticResource SectionLabel}" />
