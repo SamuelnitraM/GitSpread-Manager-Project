@@ -34,7 +34,7 @@ public sealed class TestHost : IProjectHost, IDialogService
         var dir = Directory.CreateTempSubdirectory("GitSpread app tests ").FullName;
         Services = new AppServices(accountService, gitHub, new LoginService(gh, accountService), git, credentials,
             new ProjectPublisher(git, gitHub, credentials), new BranchIntegrator(git), new TransferService(git, gitHub, credentials),
-            new LinkedProjects(git, credentials), new ProjectLinks(git, credentials),
+            new LinkedProjects(git, credentials), new ProjectLinks(git, credentials), new RepositoryCache(git, credentials, Path.Combine(dir, "cache")),
             new SshKeyService(runner, Path.Combine(dir, ".ssh")), new ProjectScanner(),
             new SettingsStore(Path.Combine(dir, "settings.json")), NullLoggerFactory.Instance, dir);
         Accounts = accounts.Length > 0 ? accounts : [Pro, Perso];

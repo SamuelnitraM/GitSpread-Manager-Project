@@ -116,7 +116,8 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
     {
         if (!ShowRepositories) { base.UpdateHistory(); return; }
         var panel = RepositoryPanel;
-        _ = History?.ShowRepositoryAsync(panel?.Name, panel?.LinkedProjects.FirstOrDefault(), panel?.CloneCommand);
+        _ = History?.ShowRepositoryAsync(panel?.Name, panel?.LinkedProjects.FirstOrDefault(), panel?.CloneCommand,
+            Account, panel?.Repository, panel?.Details?.DefaultBranch);
     }
 
     [ObservableProperty] public partial bool IsLoadingRepositories { get; set; }

@@ -100,6 +100,9 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
 
     public bool HasDetailsError => DetailsError is not null;
 
+    /// <summary>Sections repliables du panneau (F6c), état mémorisé.</summary>
+    public PanelSections Sections { get; } = new(host);
+
     /// <summary>L'état du projet vient d'être relu (après la sélection ou une action) : l'aperçu de l'historique suit.</summary>
     public event EventHandler? DetailsLoaded;
     partial void OnDetailsErrorChanged(string? value) => OnPropertyChanged(nameof(HasDetailsError));

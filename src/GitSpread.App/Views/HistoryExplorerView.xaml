@@ -195,9 +195,13 @@
                 <TextBlock Text="Choisis un commit dans l'historique pour voir ce qu'il a changé." Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
                            TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
                            Visibility="{Binding HasDetails, Converter={StaticResource InverseBoolToVisibility}}" />
-                <DockPanel Margin="16,12" Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Text="COMMIT SÉLECTIONNÉ" Style="{StaticResource SectionLabel}" Margin="0,0,0,6" />
+                <!-- Colonne entière défilante : même avec un long message et beaucoup de fichiers, on descend jusqu'aux modifications -->
+                <ScrollViewer x:Name="DetailsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Margin="16,12">
+                    <Expander Style="{StaticResource Section}" Header="COMMIT SÉLECTIONNÉ" Margin="0"
+                              IsExpanded="{Binding DataContext.Sections.HistoryCommit, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <StackPanel>
                         <TextBox Text="{Binding Details.Message, Mode=OneWay}" Style="{StaticResource SelectableText}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"
                                  MaxHeight="120" VerticalScrollBarVisibility="Auto" />
                         <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Muted}">
@@ -213,7 +217,11 @@
                         </Button>
                         <TextBlock Text="{Binding ParentsLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" />
 
-                        <TextBlock Text="PRÉSENT DANS LES BRANCHES" Style="{StaticResource SectionLabel}" />
+                    </StackPanel>
+                    </Expander>
+                    <Expander Style="{StaticResource Section}" Header="PRÉSENT DANS LES BRANCHES"
+                              IsExpanded="{Binding DataContext.Sections.HistoryBranches, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <StackPanel>
                         <ItemsControl ItemsSource="{Binding Details.Branches}">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -225,8 +233,14 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="{Binding FilesLabel}" Style="{StaticResource SectionLabel}" />
-                        <ListBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="190" BorderThickness="1" BorderBrush="{DynamicResource Border}"
+                    </StackPanel>
+                    </Expander>
+                    <Expander Style="{StaticResource Section}" Header="{Binding FilesHeader}"
+                              IsExpanded="{Binding DataContext.Sections.HistoryFiles, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding FilesLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Visibility="{Binding HasNoFiles, Converter={StaticResource BoolToVisibility}}" />
+                        <ListBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="190" PreviewMouseWheel="Nested_PreviewMouseWheel" BorderThickness="1" BorderBrush="{DynamicResource Border}"
                                  Background="Transparent" HorizontalContentAlignment="Stretch" AutomationProperties.Name="Fichiers modifiés">
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="{x:Type git:CommitFile}">
@@ -265,12 +279,15 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                        <TextBlock Text="MODIFICATIONS" Style="{StaticResource SectionLabel}" />
                     </StackPanel>
+                    </Expander>
+                    <Expander Style="{StaticResource Section}" Header="{Binding DiffHeader}"
+                              IsExpanded="{Binding DataContext.Sections.HistoryDiff, RelativeSource={RelativeSource AncestorType=UserControl}}">
 
-                    <!-- Diff : lignes ajoutées en vert, retirées en rouge -->
-                    <Grid>
+                    <!-- Diff : lignes ajoutées en vert, retirées en rouge. Il occupe la hauteur visible de la colonne et défile lui-même. -->
+                    <Grid Height="{Binding ViewportHeight, ElementName=DetailsScroll}" MinHeight="220">
                         <ListBox ItemsSource="{Binding Diff}" BorderThickness="1" BorderBrush="{DynamicResource Border}" Background="{DynamicResource Bg}"
+                                 PreviewMouseWheel="Nested_PreviewMouseWheel"
                                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto" AutomationProperties.Name="Modifications du fichier">
                             <ListBox.ItemContainerStyle>
@@ -318,7 +335,9 @@
                         <ProgressBar IsIndeterminate="True" Height="3" VerticalAlignment="Top" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource Accent}"
                                      Visibility="{Binding IsLoadingDiff, Converter={StaticResource BoolToVisibility}}" />
                     </Grid>
-                </DockPanel>
+                    </Expander>
+                </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Border>
     </Grid>

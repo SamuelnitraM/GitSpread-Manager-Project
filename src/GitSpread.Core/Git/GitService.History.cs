@@ -105,14 +105,16 @@ public sealed partial class GitService
     }
 
     /// <summary>Détail d'un commit : message complet, branches qui le contiennent, fichiers modifiés (par rapport à son premier parent).</summary>
-    public async Task<CommitDetails> GetCommitDetailsAsync(string repositoryPath, string sha, CancellationToken ct = default)
+    /// <param name="auth">Copie légère (F6c) : compte avec lequel télécharger au besoin le contenu des fichiers (détection des renommages).</param>
+    public async Task<CommitDetails> GetCommitDetailsAsync(string repositoryPath, string sha, IReadOnlyDictionary<string, string>? auth = null,
+        CancellationToken ct = default)
     {
         var head = (await ReadAsync(repositoryPath, ["show", "-s", "--decorate=full", "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%cn%x1f%B", sha], ct))
             .Split('\x1f');
         var commit = ParseHistory(string.Join('\x1f', head.Take(7)) + "\x1e")[0];
         var files = commit.Parents.Count == 0
-            ? await ReadAsync(repositoryPath, ["diff-tree", "--root", "--no-commit-id", "-r", "-M", "--name-status", "-z", sha], ct)
-            : await ReadAsync(repositoryPath, ["diff", "--name-status", "-M", "-z", commit.Parents[0], sha], ct);
+            ? await ReadAsync(repositoryPath, ["diff-tree", "--root", "--no-commit-id", "-r", "-M", "--name-status", "-z", sha], auth, ct)
+            : await ReadAsync(repositoryPath, ["diff", "--name-status", "-M", "-z", commit.Parents[0], sha], auth, ct);
         // Noms complets pour écarter refs/remotes/origin/HEAD (que git abrège en « origin », qui n'est pas une branche).
         var branches = (await ReadAsync(repositoryPath, ["branch", "--all", "--contains", sha, "--format=%(refname)"], ct))
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -147,12 +149,13 @@ public sealed partial class GitService
     }
 
     /// <summary>Modifications d'un fichier dans un commit, ligne par ligne (tronquées au-delà de <see cref="MaxDiffLines"/> lignes).</summary>
-    public async Task<IReadOnlyList<DiffLine>> GetFileDiffAsync(string repositoryPath, HistoryCommit commit, CommitFile file, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DiffLine>> GetFileDiffAsync(string repositoryPath, HistoryCommit commit, CommitFile file,
+        IReadOnlyDictionary<string, string>? auth = null, CancellationToken ct = default)
     {
         IReadOnlyList<string> paths = file.OldPath is { } old ? [old, file.Path] : [file.Path];
         var output = commit.Parents.Count == 0
-            ? await ReadAsync(repositoryPath, ["diff-tree", "--root", "-p", "-M", "--no-commit-id", commit.Sha, "--", .. paths], ct)
-            : await ReadAsync(repositoryPath, ["diff", "-M", commit.Parents[0], commit.Sha, "--", .. paths], ct);
+            ? await ReadAsync(repositoryPath, ["diff-tree", "--root", "-p", "-M", "--no-commit-id", commit.Sha, "--", .. paths], auth, ct)
+            : await ReadAsync(repositoryPath, ["diff", "-M", commit.Parents[0], commit.Sha, "--", .. paths], auth, ct);
         return ParseDiff(output);
     }
 

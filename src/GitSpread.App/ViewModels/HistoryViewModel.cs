@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GitSpread.Core.Accounts;
 using GitSpread.Core.Git;
+using GitSpread.Core.GitHub;
 using GitSpread.Core.Projects;
 using Microsoft.Extensions.Logging;
 
@@ -91,7 +93,12 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     [ObservableProperty] public partial IAsyncRelayCommand? CloneCommand { get; set; }
     public bool CanClone => CloneCommand is not null;
 
-    partial void OnProjectChanged(LocalProject? value) => OnPropertyChanged(nameof(Title));
+    partial void OnProjectChanged(LocalProject? value)
+    {
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(IsRemoteCopy));
+        OnPropertyChanged(nameof(RemoteLabel));
+    }
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
     partial void OnCloneCommandChanged(IAsyncRelayCommand? value) => OnPropertyChanged(nameof(CanClone));
     partial void OnSelectedRowChanged(HistoryRowViewModel? value) { if (WithDetails) _ = LoadDetailsAsync(value); }
@@ -106,11 +113,16 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         _ => LoadAsync(project.Project),
     };
 
-    /// <summary>Repo GitHub : l'historique de son projet local lié, ou une invitation à le cloner.</summary>
-    public Task ShowRepositoryAsync(string? name, LocalProject? linked, IAsyncRelayCommand? clone)
+    /// <summary>
+    /// Repo GitHub : l'historique de son projet local lié, sinon celui de sa copie légère en lecture seule (F6c),
+    /// lue avec le compte de l'onglet. Le bouton « Cloner en local » reste proposé.
+    /// </summary>
+    public Task ShowRepositoryAsync(string? name, LocalProject? linked, IAsyncRelayCommand? clone,
+        GitHubAccount? account = null, GitHubRepository? repository = null, string? defaultBranch = null)
     {
         CloneCommand = linked is null ? clone : null;
         if (linked is not null) return LoadAsync(linked);
+        if (account is not null && repository is not null) return LoadRemoteCopyAsync(account, repository, defaultBranch, force: false);
         return ShowMessage(name is null
             ? "Sélectionne un repo pour voir son historique."
             : $"« {name} » n'est pas cloné sur ce poste : clone-le pour voir ses branches et son historique.", keepClone: true);
@@ -120,10 +132,54 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     {
         _version++;
         if (!keepClone) CloneCommand = null;
+        _remote = null;
         Project = null;
         Clear();
         Message = message;
         return Task.CompletedTask;
+    }
+
+    // ------------------------------------------------------------ copie légère d'un repo GitHub (F6c)
+
+    private sealed record RemoteSource(GitHubAccount Account, GitHubRepository Repository, string? DefaultBranch, IReadOnlyDictionary<string, string> Auth);
+    private RemoteSource? _remote;
+
+    /// <summary>Historique lu depuis GitHub (repo pas encore cloné) : lecture seule, aucune action sur les branches.</summary>
+    public bool IsRemoteCopy => _remote is not null && Project is not null;
+
+    /// <summary>Copie pas à jour (GitHub injoignable), ou message de lecture.</summary>
+    [ObservableProperty] public partial string? RemoteNote { get; set; }
+    public string RemoteLabel => _remote is { } r
+        ? $"Aperçu de {r.Repository.FullName} sur GitHub, en lecture seule : ce repo n'est pas sur ce poste."
+        : "";
+
+    private async Task LoadRemoteCopyAsync(GitHubAccount account, GitHubRepository repository, string? defaultBranch, bool force)
+    {
+        var version = ++_version;
+        var sameRepo = _remote?.Repository.FullName == repository.FullName;
+        if (!sameRepo) { Project = null; Clear(); }
+        IsLoading = true;
+        Message = sameRepo ? null : $"Lecture de l'historique de « {repository.Name} » sur GitHub…";
+        try
+        {
+            var copy = await host.Services.Cache.EnsureAsync(account, account.Host, repository.FullName, repository.Url + ".git", force);
+            if (version != _version) return;
+            _remote = new RemoteSource(account, repository, defaultBranch, copy.Auth);
+            RemoteNote = copy.Warning;
+            await LoadCoreAsync(new LocalProject(copy.Path), null, version);
+        }
+        catch (Exception e)
+        {
+            if (version != _version) return;
+            Logger.LogWarning(e, "Copie légère de {Repo} impossible", repository.FullName);
+            _remote = null;
+            Project = null;
+            Clear();
+            Message = $"Historique de « {repository.Name} » illisible : {e.Message}";
+            IsLoading = false;
+        }
+        OnPropertyChanged(nameof(IsRemoteCopy));
+        OnPropertyChanged(nameof(RemoteLabel));
     }
 
     private void Clear()
@@ -137,18 +193,28 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     }
 
     /// <param name="selectSha">Commit à sélectionner une fois chargé (par défaut : celui déjà choisi, si c'est le même projet).</param>
-    public async Task LoadAsync(LocalProject project, string? selectSha = null)
+    public Task LoadAsync(LocalProject project, string? selectSha = null)
     {
-        var version = ++_version;
-        var keep = selectSha ?? (Project?.Path == project.Path ? SelectedRow?.Commit.Sha : null);
         if (Project?.Path != project.Path) CloneCommand = null;
+        _remote = null;
+        RemoteNote = null;
+        OnPropertyChanged(nameof(IsRemoteCopy));
+        return LoadCoreAsync(project, selectSha, ++_version);
+    }
+
+    private async Task LoadCoreAsync(LocalProject project, string? selectSha, int version)
+    {
+        var keep = selectSha ?? (Project?.Path == project.Path ? SelectedRow?.Commit.Sha : null);
         Project = project;
         IsLoading = true;
         try
         {
             var path = project.Path;
             var remotesTask = Git.GetRemotesAsync(path);
-            _defaultBranch = await Git.GetDefaultBranchAsync(path, project.RemoteName ?? "origin");
+            // Copie légère : sa branche par défaut est celle de GitHub (HEAD du dépôt nu).
+            _defaultBranch = _remote is { } remote
+                ? remote.DefaultBranch ?? await Git.GetHeadBranchAsync(path)
+                : await Git.GetDefaultBranchAsync(path, project.RemoteName ?? "origin");
             var branches = await Git.GetBranchOverviewAsync(path, _defaultBranch);
             var commits = await Git.ReadHistoryAsync(path, 0, PageSize);
             var remotes = (await remotesTask).Select(r => r.Name).ToList();
@@ -157,7 +223,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
             _remotes = remotes;
             _branches = branches;
             _commits.Clear();
-            _commits.AddRange(commits);
+            _commits.AddRange(_remote is null ? commits : commits.Select(WithoutHead)); // pas de « position actuelle » dans une copie
             HasMore = commits.Count == PageSize;
             Message = commits.Count == 0 ? $"« {project.Name} » n'a encore aucun commit." : null;
             Render(keep);
@@ -185,7 +251,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         {
             var more = await Git.ReadHistoryAsync(project.Path, _commits.Count, PageSize);
             if (version != _version) return;
-            _commits.AddRange(more);
+            _commits.AddRange(_remote is null ? more : more.Select(WithoutHead));
             HasMore = more.Count == PageSize;
             Render(SelectedRow?.Commit.Sha);
         }
@@ -194,7 +260,11 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     }
 
     [RelayCommand]
-    private Task Reload() => Project is { } p ? LoadAsync(p) : Task.CompletedTask;
+    private Task Reload() => _remote is { } r
+        ? LoadRemoteCopyAsync(r.Account, r.Repository, r.DefaultBranch, force: true) // relit GitHub
+        : Project is { } p ? LoadAsync(p) : Task.CompletedTask;
+
+    private static HistoryCommit WithoutHead(HistoryCommit c) => c.IsHead ? c with { Refs = c.Refs.Where(r => r != "HEAD").ToList() } : c;
 
     /// <summary>Calcule le graphe et remplit les listes (la ligne choisie est conservée si elle existe encore).</summary>
     private void Render(string? keepSha)
@@ -247,6 +317,12 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         else if (b.NotInDefault is { } n && _defaultBranch is { } main)
             parts.Add(n == 0 ? $"déjà intégrée dans {main}" : $"{n} commit{(n > 1 ? "s" : "")} pas encore dans {main}");
 
+        if (_remote is not null)
+        {
+            parts.Add("sur GitHub"); // copie légère : toutes les branches viennent de GitHub
+            return string.Join(" · ", parts);
+        }
+
         var info = b.Info;
         if (info.IsRemoteOnly) parts.Add($"seulement sur {where}");
         else if (info.UpstreamGone) parts.Add($"supprimée sur {where}");
@@ -283,6 +359,9 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     public ObservableCollection<CommitFile> Files { get; } = [];
     public ObservableCollection<DiffLine> Diff { get; } = [];
     public bool HasDetails => Details is not null;
+    public bool HasNoFiles => Details is not null && Files.Count == 0;
+    public string FilesHeader => $"FICHIERS MODIFIÉS ({Files.Count})";
+    public string DiffHeader => SelectedFile is { } f ? $"MODIFICATIONS · {f.Path}" : "MODIFICATIONS";
     public string FilesLabel => Details is null ? "" : Files.Count switch
     {
         0 => "Aucun fichier modifié (commit vide ou fusion sans changement).",
@@ -302,9 +381,14 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
 
     partial void OnDetailsChanged(CommitDetails? value)
     {
-        foreach (var p in new[] { nameof(HasDetails), nameof(FilesLabel), nameof(AuthorLabel), nameof(DateLabel), nameof(ParentsLabel) }) OnPropertyChanged(p);
+        foreach (var p in new[] { nameof(HasDetails), nameof(FilesLabel), nameof(AuthorLabel), nameof(DateLabel), nameof(ParentsLabel),
+                     nameof(HasNoFiles), nameof(FilesHeader) }) OnPropertyChanged(p);
     }
-    partial void OnSelectedFileChanged(CommitFile? value) => _ = LoadDiffAsync(value);
+    partial void OnSelectedFileChanged(CommitFile? value)
+    {
+        OnPropertyChanged(nameof(DiffHeader));
+        _ = LoadDiffAsync(value);
+    }
 
     private int _detailsVersion;
 
@@ -320,7 +404,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         }
         try
         {
-            var details = await Git.GetCommitDetailsAsync(project.Path, row.Commit.Sha);
+            var details = await Git.GetCommitDetailsAsync(project.Path, row.Commit.Sha, _remote?.Auth);
             if (version != _detailsVersion) return;
             Files.Clear();
             foreach (var f in details.Files) Files.Add(f);
@@ -347,7 +431,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         IsLoadingDiff = true;
         try
         {
-            var lines = await Git.GetFileDiffAsync(project.Path, details.Commit, file);
+            var lines = await Git.GetFileDiffAsync(project.Path, details.Commit, file, _remote?.Auth);
             if (version != _diffVersion) return;
             foreach (var l in lines) Diff.Add(l);
         }
@@ -364,7 +448,8 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     public event EventHandler<HistoryOpenRequest>? OpenLargeRequested;
 
     [RelayCommand]
-    private void OpenLarge() => OpenLargeRequested?.Invoke(this, new HistoryOpenRequest(Project?.Path, SelectedRow?.Commit.Sha));
+    private void OpenLarge() => OpenLargeRequested?.Invoke(this,
+        new HistoryOpenRequest(_remote?.Repository.FullName ?? Project?.Path, SelectedRow?.Commit.Sha));
 
     internal IProjectHost Host => host;
 }

@@ -25,6 +25,7 @@ public sealed record AppServices(
     TransferService Transfer,
     LinkedProjects Linked,
     ProjectLinks Links,
+    RepositoryCache Cache,
     SshKeyService SshKeys,
     ProjectScanner Scanner,
     SettingsStore SettingsStore,

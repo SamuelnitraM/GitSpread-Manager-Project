@@ -40,11 +40,15 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
         _initialKey = key;
         _initialSha = selectSha;
         History = new HistoryViewModel(host, withDetails: true) { PageSize = host.Settings.HistoryPageSize };
+        Sections = new PanelSections(host);
         History.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(HistoryViewModel.Project)) OnPropertyChanged(nameof(Title)); };
         Refresh();
     }
 
     public HistoryViewModel History { get; }
+
+    /// <summary>Parties repliables de la colonne du commit choisi (état mémorisé, comme dans les panneaux).</summary>
+    public PanelSections Sections { get; }
     public ObservableCollection<ExplorerItem> Items { get; } = [];
 
     [ObservableProperty] public partial string Filter { get; set; } = "";
@@ -73,7 +77,8 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
     {
         { Project: { IsRepository: true } p } => History.LoadAsync(p.Project, sha),
         { Project: { } p } => History.ShowAsync(p),
-        { Repository: { } r } => History.ShowRepositoryAsync(r.Name, null, new AsyncRelayCommand(() => CloneAsync(r))),
+        { Repository: { } r } => History.ShowRepositoryAsync(r.Name, null, new AsyncRelayCommand(() => CloneAsync(r)),
+            (_tab as AccountTabViewModel)?.Account, r), // copie légère en lecture seule (F6c)
         _ => Task.CompletedTask,
     };
 

@@ -151,6 +151,50 @@
                 <Setter Property="Margin" Value="0,14,0,3" />
             </Style>
 
+            <!-- Section repliable des panneaux (F6c) : titre en petites capitales et chevron ; clic sur le titre pour replier -->
+            <Style x:Key="Section" TargetType="Expander">
+                <Setter Property="Margin" Value="0,14,0,0" />
+                <Setter Property="Foreground" Value="{DynamicResource Text}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Expander">
+                            <DockPanel>
+                                <ToggleButton DockPanel.Dock="Top" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              Cursor="Hand" Focusable="True" AutomationProperties.Name="{TemplateBinding Header}"
+                                              ToolTip="Cliquer pour replier ou déplier cette section">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="Bd" Background="Transparent" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,0,1" Padding="0,6,0,4">
+                                                <DockPanel>
+                                                    <TextBlock x:Name="Chevron" DockPanel.Dock="Right" Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="10"
+                                                               Foreground="{DynamicResource Muted}" />
+                                                    <ContentPresenter />
+                                                </DockPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsChecked" Value="False">
+                                                    <Setter TargetName="Chevron" Property="Text" Value="&#xE76C;" />
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                    <TextBlock Text="{TemplateBinding Header}" Foreground="{DynamicResource Muted}" FontSize="11" FontWeight="SemiBold" />
+                                </ToggleButton>
+                                <ContentPresenter x:Name="Body" Margin="0,4,0,0" Visibility="Collapsed" />
+                            </DockPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsExpanded" Value="True">
+                                    <Setter TargetName="Body" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- Texte sélectionnable qui ressemble à un TextBlock -->
             <Style x:Key="SelectableText" TargetType="TextBox">
                 <Setter Property="IsReadOnly" Value="True" />

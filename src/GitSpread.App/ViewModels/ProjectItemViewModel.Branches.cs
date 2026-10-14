@@ -58,7 +58,8 @@ public sealed partial class ProjectItemViewModel
     [ObservableProperty] public partial BranchItemViewModel? SelectedBranch { get; set; }
     [ObservableProperty] public partial bool HasMultipleBranches { get; set; }
     [ObservableProperty] public partial bool HasSideBranches { get; set; }
-    [ObservableProperty] public partial string? MainBranch { get; set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(OtherBranchesHeader))] public partial string? MainBranch { get; set; }
+    public string OtherBranchesHeader => $"AUTRES BRANCHES ({SideBranches.Count}), COMPARÉES À {MainBranch}";
     [ObservableProperty] public partial bool HasPendingStash { get; set; }
     [ObservableProperty] public partial RepositoryOperation Operation { get; set; }
     [ObservableProperty] public partial string OperationLabel { get; set; } = "";
@@ -120,6 +121,7 @@ public sealed partial class ProjectItemViewModel
             }
         }
         HasSideBranches = SideBranches.Count > 0;
+        OnPropertyChanged(nameof(OtherBranchesHeader));
     }
 
     private void ResyncSelectedBranch()

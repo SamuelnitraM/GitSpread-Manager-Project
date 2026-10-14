@@ -19,6 +19,10 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
     public string FullName => repository.FullName;
     public string Name => repository.Name;
     public string WebUrl => repository.Url;
+    public GitHubRepository Repository => repository;
+
+    /// <summary>Sections repliables du panneau (F6c) : la zone sensible est repliée par défaut.</summary>
+    public PanelSections Sections { get; } = new(host);
 
     [ObservableProperty] public partial GitHubRepositoryDetails? Details { get; set; }
     [ObservableProperty] public partial bool IsLoading { get; set; }
@@ -85,6 +89,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             foreach (var p in Core.Projects.LinkedProjects.Find(host.LocalProjects, Account.Host, FullName)) LinkedProjects.Add(p);
             RaiseAll();
             await LoadCollaboratorsAsync();
+            await LoadBranchesAsync();
         }
         catch (Exception e)
         {
@@ -305,7 +310,8 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
         foreach (var p in new[] { nameof(HasDetails), nameof(HasDescription), nameof(HasHomepage), nameof(IsPrivate), nameof(IsArchived), nameof(IsFork),
                      nameof(CanAdminister), nameof(CanAct), nameof(ShowAdminNote), nameof(VisibilityLabel), nameof(ToggleVisibilityLabel),
                      nameof(ToggleArchiveLabel), nameof(LinkedLabel), nameof(FactsLabel), nameof(HasTopics), nameof(HasLinkedProjects),
-                     nameof(IsViewerCollaborator), nameof(CanLeave), nameof(CanManageCollaborators), nameof(OwnerLabel) })
+                     nameof(IsViewerCollaborator), nameof(CanLeave), nameof(CanManageCollaborators), nameof(OwnerLabel),
+                     nameof(CanEditBranches) })
             OnPropertyChanged(p);
     }
 

@@ -63,6 +63,8 @@ public sealed class HistoryTests : IDisposable
         Assert.Equal("1 fichier modifié", history.FilesLabel);
         Assert.Equal("login.txt", history.SelectedFile!.Path);
         Assert.Equal([DiffLineKind.Hunk, DiffLineKind.Added, DiffLineKind.Added], history.Diff.Select(d => d.Kind));
+        Assert.Equal("FICHIERS MODIFIÉS (1)", history.FilesHeader);
+        Assert.Equal("MODIFICATIONS · login.txt", history.DiffHeader);
 
         history.SelectedRow = history.Rows[1]; // la fusion
         await TestHost.WaitUntil(() => history.Details?.Commit.Subject.StartsWith("Merge") == true && history.SelectedFile?.Path == "paiement.txt");
@@ -147,25 +149,56 @@ public sealed class HistoryTests : IDisposable
 
         Assert.Equal([(HistoryExplorerViewModel.LocalGroup, project.Name), (HistoryExplorerViewModel.GitHubGroup, "site")],
             explorer.Items.Select(i => (i.Group, i.Name)));
-        explorer.SelectedItem = explorer.Items[1];
-        await TestHost.WaitUntil(() => explorer.History.CanClone);
-        Assert.Contains("« site » n'est pas cloné sur ce poste", explorer.History.Message);
+        Assert.Null(explorer.Items[1].Project); // repo sur GitHub seulement : historique lu depuis sa copie légère (test suivant)
     }
 
     [Fact]
-    public async Task A_github_repository_without_local_clone_offers_to_clone_it()
+    public async Task A_github_repository_not_on_this_machine_shows_a_read_only_history()
     {
-        var host = new TestHost();
-        host.Runner.When(["repo", "view"], """{"name":"stock","owner":{"login":"SmartDev-Web"},"visibility":"PRIVATE","viewerPermission":"ADMIN"}""")
-            .When(["api"], "[]");
-        var tab = new AccountTabViewModel(TestHost.Pro, host, NullLogger.Instance) { History = new HistoryViewModel(host), ShowRepositories = true };
-        var stock = new GitHubRepository("stock", "SmartDev-Web", "https://github.com/SmartDev-Web/stock", "", RepositoryVisibility.Private);
+        // « GitHub » = dépôt nu local (le ViewModel ajoute .git à l'adresse du repo).
+        var bare = await _repo.BareAsync("stock.git");
+        await ProjectWithBranchesAsync();
+        await _repo.Git("push", "-q", bare, "main", "feature/login", "fix/paiement");
+        var host = new TestHost(realGit: true);
+        var stock = new GitHubRepository("stock", "SmartDev-Web", bare[..^4], "", RepositoryVisibility.Private);
+        var clone = new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Task.CompletedTask);
+        var history = new HistoryViewModel(host, withDetails: true);
 
-        tab.SelectedRepository = new RepositoryItemViewModel(stock, TestHost.Pro);
-        await TestHost.WaitUntil(() => tab.History.CanClone);
+        await history.ShowRepositoryAsync("stock", null, clone, TestHost.Pro, stock, defaultBranch: "main");
 
-        Assert.Contains("n'est pas cloné sur ce poste", tab.History.Message);
-        Assert.Same(tab.RepositoryPanel!.CloneCommand, tab.History.CloneCommand);
+        Assert.True(history is { IsRemoteCopy: true, CanClone: true, HasMessage: false });
+        Assert.Contains("en lecture seule", history.RemoteLabel);
+        Assert.Equal(4, history.Rows.Count);
+        Assert.DoesNotContain(history.Rows, r => r.Commit.IsHead); // pas de « position actuelle » dans une copie
+        Assert.Equal("1 commit pas encore dans main · sur GitHub", history.Branches.Single(b => b.Name == "feature/login").StateLabel);
+        Assert.Equal(host.Services.Cache.PathFor("github.com", "SmartDev-Web/stock"), history.Project!.Path); // jamais dans les dossiers de projets
+        await TestHost.WaitUntil(() => history.Diff.Count > 0); // le contenu des fichiers est lu à la demande
+        Assert.Equal("login.txt", history.SelectedFile!.Path);
+
+        // Ouvrir en grand vise le repo (son nom complet), pas le dossier de la copie.
+        HistoryOpenRequest? request = null;
+        history.OpenLargeRequested += (_, r) => request = r;
+        history.OpenLargeCommand.Execute(null);
+        Assert.Equal("SmartDev-Web/stock", request!.Key);
+
+        // Une copie déjà là est réutilisée (et mise à jour) : nouveau commit sur « GitHub », « Relire » le montre.
+        await _repo.CommitFileAsync("nouveau.txt", "n", "Nouveau sur GitHub");
+        await _repo.Git("push", "-q", bare, "main");
+        await history.ReloadCommand.ExecuteAsync(null);
+        Assert.Equal("Nouveau sur GitHub", history.Rows[0].Subject);
+    }
+
+    [Fact]
+    public async Task A_github_repository_that_cannot_be_read_still_offers_to_clone_it()
+    {
+        var host = new TestHost(realGit: true);
+        var missing = new GitHubRepository("absent", "SmartDev-Web", Path.Combine(_repo.Root, "absent"), "", RepositoryVisibility.Private);
+        var history = new HistoryViewModel(host);
+
+        await history.ShowRepositoryAsync("absent", null, new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Task.CompletedTask), TestHost.Pro, missing);
+
+        Assert.True(history is { IsRemoteCopy: false, CanClone: true });
+        Assert.Contains("illisible", history.Message);
     }
 
     public void Dispose() => _repo.Dispose();

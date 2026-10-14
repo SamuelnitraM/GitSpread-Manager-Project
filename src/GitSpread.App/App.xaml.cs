@@ -54,6 +54,7 @@ public partial class App : Application
             Transfer: new TransferService(git, gitHub, credentials),
             Linked: new LinkedProjects(git, credentials),
             Links: new ProjectLinks(git, credentials),
+            Cache: new RepositoryCache(git, credentials, Path.Combine(DataDirectory, "cache")),
             SshKeys: new SshKeyService(runner),
             Scanner: new ProjectScanner(),
             SettingsStore: new SettingsStore(SettingsStore.DefaultPath),

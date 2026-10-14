@@ -193,87 +193,145 @@
                         </ItemsControl>
                         <TextBlock Text="{Binding FactsLabel}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
 
-                        <TextBlock Text="SUR CE POSTE" Style="{StaticResource SectionLabel}" />
-                        <TextBlock Text="{Binding LinkedLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-                        <ItemsControl ItemsSource="{Binding LinkedProjects}" Margin="0,2,0,0">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBox Text="{Binding Path, Mode=OneWay}" Style="{StaticResource SelectableText}" FontSize="12" Margin="0,2" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <WrapPanel Margin="0,8,0,0" IsEnabled="{Binding CanAct}">
-                            <Button Style="{StaticResource PrimaryButton}" Command="{Binding CloneCommand}" Margin="0,0,8,8" AutomationProperties.Name="Cloner en local">
-                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Cloner en local…" /></StackPanel>
-                            </Button>
-                        </WrapPanel>
-
-                        <!-- Collaborateurs (F3A) -->
-                        <TextBlock Text="COLLABORATEURS" Style="{StaticResource SectionLabel}" />
-                        <TextBlock Text="{Binding CollaboratorsLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
-                        <ItemsControl ItemsSource="{Binding Collaborators}" Margin="0,2,0,0">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:CollaboratorRow}">
-                                    <DockPanel Margin="0,4,0,0">
-                                        <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="{Binding ActionLabel}" VerticalAlignment="Center"
-                                                Command="{Binding DataContext.RemoveCollaboratorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                                AutomationProperties.Name="{Binding Login, StringFormat=Retirer {0}}"
-                                                IsEnabled="{Binding DataContext.CanManageCollaborators, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                Visibility="{Binding DataContext.CanManageCollaborators, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}}" />
-                                        <TextBlock Text="&#xE77B;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Login}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <Border Margin="0,6,0,0" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="10,6"
-                                Visibility="{Binding HasCollaboratorsError, Converter={StaticResource BoolToVisibility}}">
-                            <TextBox Text="{Binding CollaboratorsError, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
-                        </Border>
-                        <WrapPanel Margin="0,8,0,0">
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding InviteCollaboratorCommand}" Margin="0,0,8,8"
-                                    IsEnabled="{Binding CanManageCollaborators}" AutomationProperties.Name="Ajouter un collaborateur"
-                                    Visibility="{Binding IsViewerCollaborator, Converter={StaticResource InverseBoolToVisibility}}"
-                                    ToolTip="Donner à un autre compte le droit d'envoyer des commits sur ce repo (il reste chez son propriétaire)">
-                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8FA;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Ajouter un collaborateur…" /></StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding LeaveCommand}" Margin="0,0,8,8"
-                                    IsEnabled="{Binding CanLeave}" AutomationProperties.Name="Quitter ce repo"
-                                    Visibility="{Binding IsViewerCollaborator, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Renoncer à l'accès de collaborateur de ce compte (les fichiers locaux ne sont pas touchés)">
-                                <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE89B;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Quitter ce repo…" /></StackPanel>
-                            </Button>
-                        </WrapPanel>
-                        <TextBlock Text="{Binding CollaboratorsNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
-
-                        <TextBlock Text="GÉRER SUR GITHUB" Style="{StaticResource SectionLabel}" />
-                        <TextBlock Text="Seul un administrateur du repo peut le renommer, changer sa visibilité, l'archiver, le transférer ou le supprimer."
-                                   Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"
-                                   Visibility="{Binding ShowAdminNote, Converter={StaticResource BoolToVisibility}}" />
-                        <WrapPanel>
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding EditCommand}" Content="Modifier…" Margin="0,0,8,8" IsEnabled="{Binding CanAct}"
-                                    ToolTip="Description, site web et sujets" />
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding RenameCommand}" Content="Renommer…" Margin="0,0,8,8" IsEnabled="{Binding CanAdminister}" />
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding RenameDefaultBranchCommand}" Content="Renommer la branche principale…" Margin="0,0,8,8"
-                                    IsEnabled="{Binding CanAdminister}" ToolTip="Ex. master → main, sur GitHub et dans les projets locaux liés" />
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleVisibilityCommand}" Content="{Binding ToggleVisibilityLabel}" Margin="0,0,8,8"
-                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="{Binding ToggleVisibilityLabel}" />
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleArchiveCommand}" Content="{Binding ToggleArchiveLabel}" Margin="0,0,8,8"
-                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="{Binding ToggleArchiveLabel}" />
-                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding TransferCommand}" Content="Transférer à un autre compte…" Margin="0,0,8,8"
-                                    IsEnabled="{Binding CanAdminister}" />
-                        </WrapPanel>
-                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding DeleteCommand}" HorizontalAlignment="Left" Margin="0,4,0,0"
-                                IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="Supprimer le repo"
-                                ToolTip="Suppression définitive sur GitHub (les fichiers locaux ne sont jamais touchés)">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE74D;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Danger}" Margin="0,0,6,0" />
-                                <TextBlock Text="Supprimer le repo…" Foreground="{DynamicResource Danger}" />
+                        <!-- ============ Sections repliables (F6c), état mémorisé ============ -->
+                        <Expander Style="{StaticResource Section}" Header="AU QUOTIDIEN" IsExpanded="{Binding Sections.RepoDaily}">
+                            <StackPanel>
+                                <TextBlock Text="SUR CE POSTE" Style="{StaticResource SectionLabel}" Margin="0,4,0,3" />
+                                <TextBlock Text="{Binding LinkedLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                <ItemsControl ItemsSource="{Binding LinkedProjects}" Margin="0,2,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Path, Mode=OneWay}" Style="{StaticResource SelectableText}" FontSize="12" Margin="0,2" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <WrapPanel Margin="0,8,0,0" IsEnabled="{Binding CanAct}">
+                                    <Button Style="{StaticResource PrimaryButton}" Command="{Binding CloneCommand}" Margin="0,0,8,8" AutomationProperties.Name="Cloner en local">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Cloner en local…" /></StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource SecondaryButton}" Command="{Binding EditCommand}" Content="Modifier…" Margin="0,0,8,8"
+                                            AutomationProperties.Name="Modifier…" ToolTip="Description, site web et sujets du repo" />
+                                </WrapPanel>
                             </StackPanel>
-                        </Button>
+                        </Expander>
+                        <Expander Style="{StaticResource Section}" Header="BRANCHES" IsExpanded="{Binding Sections.RepoBranches}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding BranchesLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                <ItemsControl ItemsSource="{Binding Branches}" Margin="0,2,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:GitHubBranchRow}">
+                                            <DockPanel Margin="0,5,0,0">
+                                                <Ellipse x:Name="Dot" DockPanel.Dock="Left" Width="11" Height="11" Margin="0,4,8,0" VerticalAlignment="Top"
+                                                         Fill="{Binding Color, Converter={StaticResource BranchBrush}}" />
+                                                <StackPanel>
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding DateLabel}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="6,0,0,0" />
+                                                        <TextBlock x:Name="Name" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    </DockPanel>
+                                                    <TextBlock Text="{Binding StateLabel}" FontSize="12" TextWrapping="Wrap" Opacity="0.85" />
+                                                    <TextBlock Text="{Binding LastCommit}" FontSize="12" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+                                                    <WrapPanel Margin="-6,1,0,0"
+                                                               Visibility="{Binding DataContext.CanEditBranches, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}}">
+                                                        <Button Style="{StaticResource GhostButton}" Content="Renommer…" FontSize="12"
+                                                                Command="{Binding DataContext.RenameBranchCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                AutomationProperties.Name="{Binding Name, StringFormat=Renommer la branche {0}}" />
+                                                        <Button Style="{StaticResource GhostButton}" Content="Supprimer…" FontSize="12" Foreground="{DynamicResource Danger}"
+                                                                Command="{Binding DataContext.DeleteBranchCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                Visibility="{Binding CanDelete, Converter={StaticResource BoolToVisibility}}"
+                                                                AutomationProperties.Name="{Binding Name, StringFormat=Supprimer la branche {0}}" />
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </DockPanel>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsDefault}" Value="True">
+                                                    <Setter TargetName="Name" Property="FontWeight" Value="Bold" />
+                                                    <Setter TargetName="Dot" Property="Width" Value="13" />
+                                                    <Setter TargetName="Dot" Property="Height" Value="13" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Border Margin="0,6,0,0" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="10,6"
+                                        Visibility="{Binding HasBranchesError, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBox Text="{Binding BranchesError, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
+                                </Border>
+                            </StackPanel>
+                        </Expander>
+                        <Expander Style="{StaticResource Section}" Header="PARTAGE" IsExpanded="{Binding Sections.RepoSharing}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding CollaboratorsLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                <ItemsControl ItemsSource="{Binding Collaborators}" Margin="0,2,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:CollaboratorRow}">
+                                            <DockPanel Margin="0,4,0,0">
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="{Binding ActionLabel}" VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.RemoveCollaboratorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                        AutomationProperties.Name="{Binding Login, StringFormat=Retirer {0}}"
+                                                        IsEnabled="{Binding DataContext.CanManageCollaborators, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        Visibility="{Binding DataContext.CanManageCollaborators, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock Text="&#xE77B;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Login}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Border Margin="0,6,0,0" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="10,6"
+                                        Visibility="{Binding HasCollaboratorsError, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBox Text="{Binding CollaboratorsError, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
+                                </Border>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Style="{StaticResource SecondaryButton}" Command="{Binding InviteCollaboratorCommand}" Margin="0,0,8,8"
+                                            IsEnabled="{Binding CanManageCollaborators}" AutomationProperties.Name="Ajouter un collaborateur"
+                                            Visibility="{Binding IsViewerCollaborator, Converter={StaticResource InverseBoolToVisibility}}"
+                                            ToolTip="Donner à un autre compte le droit d'envoyer des commits sur ce repo (il reste chez son propriétaire)">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8FA;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Ajouter un collaborateur…" /></StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource SecondaryButton}" Command="{Binding LeaveCommand}" Margin="0,0,8,8"
+                                            IsEnabled="{Binding CanLeave}" AutomationProperties.Name="Quitter ce repo"
+                                            Visibility="{Binding IsViewerCollaborator, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Renoncer à l'accès de collaborateur de ce compte (les fichiers locaux ne sont pas touchés)">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE89B;" Style="{StaticResource Glyph}" Margin="0,0,6,0" /><TextBlock Text="Quitter ce repo…" /></StackPanel>
+                                    </Button>
+                                </WrapPanel>
+                                <TextBlock Text="{Binding CollaboratorsNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Expander>
+                        <Expander Style="{StaticResource Section}" Header="ZONE SENSIBLE" IsExpanded="{Binding Sections.RepoDanger}">
+                            <StackPanel>
+                                <Border Margin="0,6,0,0" Background="{DynamicResource DangerSoft}" BorderBrush="{DynamicResource DangerBorder}" BorderThickness="1"
+                                        CornerRadius="6" Padding="10,8">
+                                    <StackPanel>
+                                        <TextBlock TextWrapping="Wrap" FontSize="12"
+                                                   Text="Ces actions changent le repo pour tous ceux qui l'utilisent. Chacune demande une confirmation, et la suppression est définitive." />
+                                        <TextBlock Text="Seul un administrateur du repo peut le renommer, changer sa visibilité, l'archiver, le transférer ou le supprimer."
+                                                   Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                   Visibility="{Binding ShowAdminNote, Converter={StaticResource BoolToVisibility}}" />
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding RenameCommand}" Content="Renommer le repo…" Margin="0,0,8,8"
+                                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="Renommer…" />
+                                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleVisibilityCommand}" Content="{Binding ToggleVisibilityLabel}" Margin="0,0,8,8"
+                                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="{Binding ToggleVisibilityLabel}" />
+                                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleArchiveCommand}" Content="{Binding ToggleArchiveLabel}" Margin="0,0,8,8"
+                                                    IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="{Binding ToggleArchiveLabel}" />
+                                            <Button Style="{StaticResource SecondaryButton}" Command="{Binding TransferCommand}" Content="Transférer à un autre compte…" Margin="0,0,8,8"
+                                                    IsEnabled="{Binding CanAdminister}" />
+                                        </WrapPanel>
+                                        <Button Style="{StaticResource SecondaryButton}" Command="{Binding DeleteCommand}" HorizontalAlignment="Left"
+                                                IsEnabled="{Binding CanAdminister}" AutomationProperties.Name="Supprimer le repo"
+                                                ToolTip="Suppression définitive sur GitHub (les fichiers locaux ne sont jamais touchés)">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE74D;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Danger}" Margin="0,0,6,0" />
+                                                <TextBlock Text="Supprimer le repo…" Foreground="{DynamicResource Danger}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Expander>
 
                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
                             <ProgressBar IsIndeterminate="True" Width="60" Height="3" BorderThickness="0" Foreground="{DynamicResource Accent}" Background="Transparent" Margin="0,0,8,0" />
@@ -302,8 +360,10 @@
                                 <TextBlock Text="{Binding LastAction.Title}" FontWeight="SemiBold" />
                             </StackPanel>
                             <TextBox Text="{Binding LastAction.Message, Mode=OneWay}" Style="{StaticResource SelectableText}" Margin="0,4,0,0" />
-                            <TextBox Text="{Binding LastAction.Commands, Mode=OneWay}" Style="{StaticResource SelectableText}" FontFamily="Consolas" FontSize="12"
-                                     Foreground="{DynamicResource Muted}" Margin="0,6,0,0" />
+                            <Expander Style="{StaticResource Section}" Header="COMMANDES EXÉCUTÉES" Margin="0,8,0,0" IsExpanded="{Binding Sections.ActionCommands}">
+                                <TextBox Text="{Binding LastAction.Commands, Mode=OneWay}" Style="{StaticResource SelectableText}" FontFamily="Consolas" FontSize="12"
+                                         Foreground="{DynamicResource Muted}" />
+                            </Expander>
                         </StackPanel>
                     </Border>
                 </StackPanel>

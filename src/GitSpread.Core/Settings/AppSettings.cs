@@ -30,6 +30,9 @@ public sealed class AppSettings
     public bool ShowHistoryPreview { get; set; } = true;
     public double HistoryPreviewHeight { get; set; } = 110;
 
+    /// <summary>Sections repliables des panneaux (F6c) : ouverte (vrai) ou repliée, par clé de section. Absente : état par défaut.</summary>
+    public Dictionary<string, bool> PanelSections { get; set; } = [];
+
     /// <summary>Nombre de commits chargés à chaque fois dans l'historique (« Afficher plus » charge la suite).</summary>
     public int HistoryPageSize { get; set; } = 300;
 

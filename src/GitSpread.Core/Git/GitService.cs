@@ -260,9 +260,13 @@ public sealed partial class GitService(IProcessRunner runner)
         IReadOnlyDictionary<string, string>? auth, CancellationToken ct, TimeSpan? timeout = null) =>
         new(Display(args), await RunAsync(directory, args, auth, ct, timeout));
 
-    private async Task<string> ReadAsync(string repositoryPath, IReadOnlyList<string> args, CancellationToken ct)
+    private Task<string> ReadAsync(string repositoryPath, IReadOnlyList<string> args, CancellationToken ct) =>
+        ReadAsync(repositoryPath, args, null, ct);
+
+    /// <param name="auth">Pour une copie légère (F6c) : git peut avoir à télécharger le contenu d'un fichier.</param>
+    private async Task<string> ReadAsync(string repositoryPath, IReadOnlyList<string> args, IReadOnlyDictionary<string, string>? auth, CancellationToken ct)
     {
-        var result = await RunAsync(repositoryPath, args, null, ct);
+        var result = await RunAsync(repositoryPath, args, auth, ct);
         if (result.Succeeded) return result.StandardOutput;
 
         var error = result.StandardError.Trim();

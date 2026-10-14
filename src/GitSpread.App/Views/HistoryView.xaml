@@ -9,6 +9,33 @@
     <!-- Graphe des branches et liste des commits (F6a) : aperçu en bas de page et centre de la grande fenêtre -->
     <Grid>
         <DockPanel>
+            <!-- Repo pas encore cloné : historique lu depuis GitHub, en lecture seule (F6c) -->
+            <Border DockPanel.Dock="Top" Background="{DynamicResource AccentSoft}" Padding="10,4"
+                    Visibility="{Binding IsRemoteCopy, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Command="{Binding CloneCommand}" FontSize="12"
+                            AutomationProperties.Name="Cloner en local" Visibility="{Binding CanClone, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Créer une vraie copie de travail sur ce poste pour modifier le projet">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE896;" Style="{StaticResource Glyph}" FontSize="11" Margin="0,0,6,0" /><TextBlock Text="Cloner en local…" /></StackPanel>
+                    </Button>
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE753;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Accent}" Margin="0,0,8,0" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding RemoteLabel}" FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding RemoteNote}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Warning}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding RemoteNote}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
             <!-- Pied : légende (grande fenêtre) et « Afficher plus » -->
             <DockPanel DockPanel.Dock="Bottom" Margin="8,4,8,6">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
