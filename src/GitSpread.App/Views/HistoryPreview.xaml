@@ -18,9 +18,9 @@
         <Border DockPanel.Dock="Top" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,0,1" Padding="12,4">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Style="{StaticResource GhostButton}" Command="{Binding OpenLargeCommand}" AutomationProperties.Name="Ouvrir l historique en grand"
-                            ToolTip="Ouvrir l'historique en grand : projets, branches, détail des commits et modifications">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE740;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,6,0" /><TextBlock Text="Ouvrir en grand" FontSize="12" /></StackPanel>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding OpenLargeCommand}" AutomationProperties.Name="Agrandir l historique"
+                            ToolTip="Agrandir l'historique : projets, branches, détail des commits et modifications">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE740;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,6,0" /><TextBlock Text="Agrandir" FontSize="12" /></StackPanel>
                     </Button>
                     <Button Style="{StaticResource GhostButton}" Command="{Binding ReloadCommand}" AutomationProperties.Name="Relire l historique" ToolTip="Relire l'historique">
                         <TextBlock Text="&#xE72C;" Style="{StaticResource Glyph}" FontSize="12" />

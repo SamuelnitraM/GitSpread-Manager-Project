@@ -49,7 +49,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     // ------------------------------------------------------------ apparence
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
-        [new("System", "Comme Windows"), new("Light", "Clair"), new("Dark", "Sombre")];
+        [new("System", "Thème du système"), new("Light", "Clair"), new("Dark", "Sombre")];
 
     public ThemeOption SelectedTheme
     {

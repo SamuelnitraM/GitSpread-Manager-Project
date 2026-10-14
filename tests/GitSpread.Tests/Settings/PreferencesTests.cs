@@ -83,6 +83,7 @@ public class PreferencesTests
 
         settings.RemoveKnownEmail("github.com", "samuelnitram", "EMAIL1@exemple.fr");
         Assert.False(settings.IsKnownEmail("github.com", "SamuelnitraM", "email1@exemple.fr"));
+        Assert.Empty(settings.AccountEmails); // plus aucune adresse : l'entrée du compte disparaît
     }
 
     [Fact]

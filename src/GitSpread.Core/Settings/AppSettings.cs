@@ -119,8 +119,10 @@ public sealed class AppSettings
 
     public void RemoveKnownEmail(string host, string login, string email)
     {
-        if (AccountEmails.TryGetValue(AccountKey(host, login), out var emails))
-            emails.RemoveAll(e => e.Equals(email, StringComparison.OrdinalIgnoreCase));
+        var key = AccountKey(host, login);
+        if (!AccountEmails.TryGetValue(key, out var emails)) return;
+        emails.RemoveAll(e => e.Equals(email, StringComparison.OrdinalIgnoreCase));
+        if (emails.Count == 0) AccountEmails.Remove(key);
     }
 
     public static string AccountKey(string host, string login) => $"{host}/{login}".ToLowerInvariant();

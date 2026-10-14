@@ -357,7 +357,7 @@
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="{Binding}" VerticalAlignment="Center" />
                                                         <Button Style="{StaticResource GhostButton}" Content="Retirer" FontSize="12" Margin="8,0,0,0"
-                                                                Command="{Binding DataContext.RemoveEmailCommand, RelativeSource={RelativeSource AncestorType=ItemsControl, AncestorLevel=2}}"
+                                                                Command="{Binding DataContext.RemoveEmailCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                                 CommandParameter="{Binding}" AutomationProperties.Name="{Binding StringFormat=Retirer l’adresse {0}}" />
                                                     </StackPanel>
                                                 </DataTemplate>
