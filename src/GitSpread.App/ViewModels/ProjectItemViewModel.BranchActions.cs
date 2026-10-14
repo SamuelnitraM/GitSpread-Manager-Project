@@ -26,12 +26,12 @@ public sealed partial class ProjectItemViewModel
         if (string.IsNullOrWhiteSpace(name)) return;
         name = name.Trim();
 
-        await RunAsync("Nouvelle branche", async () =>
-            ActionLog.From("Nouvelle branche", [await Git.CreateBranchAtAsync(Path, name, sha)], $"Branche « {name} » créée à partir du commit {shortSha}."));
-        if (LastAction is not { Succeeded: true } created) return;
+        if (await RunAsync("Nouvelle branche", async () =>
+                ActionLog.From("Nouvelle branche", [await Git.CreateBranchAtAsync(Path, name, sha)], $"Branche « {name} » créée à partir du commit {shortSha}."))
+            is not { Succeeded: true } created) return;
 
         await SwitchBranchAsync(new BranchItemViewModel(new BranchInfo(name) { IsLocal = true }));
-        if (LastAction is { Succeeded: true } switched)
+        if (LastAction is { Succeeded: true } switched && !ReferenceEquals(switched, created)) // bascule annulée : rien à fusionner
             LastAction = switched with { Title = created.Title, Message = created.Message + " " + switched.Message, Commands = created.Commands + "\n" + switched.Commands };
     }
 
@@ -123,9 +123,17 @@ public sealed partial class ProjectItemViewModel
             return;
         }
 
-        var remoteRef = $"{PrimaryRemote}/{name}";
         var onGitHub = await Git.RemoteBranchExistsAsync(Path, PrimaryRemote, name);
-        string[] mainRef = defaultBranch is null ? [] : [Branches.FirstOrDefault(b => b.Name == defaultBranch)?.Branch.Ref ?? defaultBranch];
+        if (!branch.IsLocal && !onGitHub)
+        {
+            // Branche seulement sur un lien secondaire (F3B) : rien à supprimer ici.
+            LastAction = ActionLog.Failure(title, $"« {name} » n'existe que sur le lien « {branch.RemoteRef?.Split('/')[0]} » : "
+                + "supprime-la depuis le panneau de ce repo (Repos sur GitHub › Branches).");
+            return;
+        }
+        // Références complètes : un tag ou un dossier du même nom ne fausse pas le compte des commits perdus.
+        var main = defaultBranch is null ? null : Branches.FirstOrDefault(b => b.Name == defaultBranch)?.Branch;
+        string[] mainRef = main is null ? [] : [main.IsLocal ? $"refs/heads/{main.Name}" : $"refs/remotes/{main.RemoteRef}"];
 
         bool deleteLocal = branch.IsLocal, deleteRemote;
         if (branch.IsLocal && onGitHub)
@@ -141,7 +149,7 @@ public sealed partial class ProjectItemViewModel
         else deleteRemote = !branch.IsLocal && onGitHub;
 
         // Ce qui serait perdu : commits absents de la branche principale (et de GitHub, si on ne supprime qu'ici).
-        var reference = branch.IsLocal ? name : remoteRef;
+        var reference = branch.IsLocal ? $"refs/heads/{name}" : $"refs/remotes/{PrimaryRemote}/{name}";
         var lost = deleteRemote
             ? await Git.CountCommitsOnlyInAsync(Path, reference, mainRef, excludeRemotes: false)
             : await Git.CountCommitsOnlyInAsync(Path, reference, mainRef, excludeRemotes: true);

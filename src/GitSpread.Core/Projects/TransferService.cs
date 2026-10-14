@@ -172,12 +172,13 @@ public sealed class TransferService(GitService git, GitHubService gitHub, GitCre
         catch (Exception e)
         {
             // Retour arrière : le projet retrouve son lien d'origine.
+            // Jamais interrompu (CancellationToken.None) : le lien d'origine doit revenir même après une annulation.
             progress?.Report("Échec : retour à la configuration d'origine…");
-            await git.RemoveRemoteAsync(dir, plan.RemoteName, ct);
+            await git.RemoveRemoteAsync(dir, plan.RemoteName, CancellationToken.None);
             if (old is not null)
             {
-                if (plan.OldRemote == OldRemoteAction.KeepAsOldOrigin) await git.RenameRemoteAsync(dir, keptAs, plan.RemoteName, ct);
-                else await git.AddRemoteAsync(dir, plan.RemoteName, old.Url, ct);
+                if (plan.OldRemote == OldRemoteAction.KeepAsOldOrigin) await git.RenameRemoteAsync(dir, keptAs, plan.RemoteName, CancellationToken.None);
+                else await git.AddRemoteAsync(dir, plan.RemoteName, old.Url, CancellationToken.None);
             }
             var created = plan.CreateRepository ? $" Le repo {plan.FullName} a été créé sur GitHub et reste vide : tu peux le réutiliser ou le supprimer depuis GitHub." : "";
             throw new InvalidOperationException($"{e.Message} Le projet a retrouvé {(plan.KeepCurrentLink ? "ses liens d'origine" : "son lien d'origine")}.{created}", e);

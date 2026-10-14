@@ -35,6 +35,12 @@ public partial class App : Application
         Log.Information("GitSpread {Version} démarre", typeof(App).Assembly.GetName().Version);
 
         DispatcherUnhandledException += OnUnhandledException;
+        GitService.PurgePreviews(); // aperçus d'images d'une session précédente (ils peuvent venir de repos privés)
+
+        // Erreurs de liaison WPF (propriété introuvable, conversion impossible…) : invisibles sinon, écrites dans les journaux.
+        System.Diagnostics.PresentationTraceSources.Refresh();
+        System.Diagnostics.PresentationTraceSources.DataBindingSource.Switch.Level = System.Diagnostics.SourceLevels.Warning;
+        System.Diagnostics.PresentationTraceSources.DataBindingSource.Listeners.Add(new BindingErrorListener());
 
         // Composition manuelle : peu de services, pas besoin d'un conteneur.
         var runner = new ProcessRunner(_loggerFactory.CreateLogger<ProcessRunner>());
@@ -73,6 +79,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         Log.Information("GitSpread s'arrête");
+        GitService.PurgePreviews();
         Log.CloseAndFlush();
         _loggerFactory?.Dispose();
         base.OnExit(e);
@@ -84,5 +91,23 @@ public partial class App : Application
         MessageBox.Show($"Une erreur inattendue s'est produite :\n\n{e.Exception.Message}\n\nDétails dans les journaux :\n{Path.Combine(DataDirectory, "logs")}",
             "GitSpread", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
+    }
+}
+
+/// <summary>Écrit les erreurs de liaison WPF dans les journaux (une seule fois chacune).</summary>
+internal sealed class BindingErrorListener : System.Diagnostics.TraceListener
+{
+    private readonly HashSet<string> _seen = [];
+    private readonly System.Text.StringBuilder _line = new();
+
+    public override void Write(string? message) => _line.Append(message);
+
+    public override void WriteLine(string? message)
+    {
+        _line.Append(message);
+        var text = _line.ToString();
+        _line.Clear();
+        lock (_seen)
+            if (_seen.Add(text)) Log.Warning("Liaison WPF : {Error}", text);
     }
 }

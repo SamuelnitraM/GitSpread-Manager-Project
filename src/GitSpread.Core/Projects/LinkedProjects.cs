@@ -20,23 +20,32 @@ public sealed class LinkedProjects(GitService git, GitCredentialResolver credent
             .OrderBy(r => r.Name == project.RemoteName ? 0 : 1)
             .FirstOrDefault();
 
-    // Remote concerné : celui qui pointe vers le repo indiqué, sinon le principal.
-    private static ProjectRemote Target(LocalProject project, string? fullName) =>
-        (fullName is not null && project.Remote is { } primary ? RemoteFor(project, primary.Host, fullName) : null)
-        ?? new ProjectRemote(project.RemoteName ?? "origin", project.Remote!);
+    // Remote concerné : celui qui pointe vers le repo indiqué (quel que soit l'hôte du lien principal), sinon le principal.
+    // Si le repo est indiqué mais qu'aucun lien n'y pointe, on refuse plutôt que de toucher à un autre lien.
+    private static ProjectRemote Target(LocalProject project, string? fullName, string? host = null)
+    {
+        if (fullName is null) return new ProjectRemote(project.RemoteName ?? "origin", project.Remote!);
+        return project.AllRemotes
+                   .Where(r => string.Equals(r.Url.FullName, fullName, StringComparison.OrdinalIgnoreCase))
+                   .Where(r => host is null || r.Url.Host.Equals(host, StringComparison.OrdinalIgnoreCase))
+                   .OrderBy(r => r.Name == project.RemoteName ? 0 : 1)
+                   .FirstOrDefault()
+               ?? throw new InvalidOperationException($"Aucun lien de « {project.Name} » ne pointe vers {fullName}.");
+    }
 
     /// <summary>Le repo a changé de nom ou de propriétaire : le lien local suit (même forme d'URL).</summary>
     /// <param name="fullName">Ancien nom complet du repo : désigne le lien à mettre à jour (le principal par défaut).</param>
-    public async Task<GitResult> FollowAsync(LocalProject project, string newOwner, string newName, string? fullName = null, CancellationToken ct = default)
+    public async Task<GitResult> FollowAsync(LocalProject project, string newOwner, string newName, string? fullName = null, CancellationToken ct = default,
+        string? host = null)
     {
-        var remote = Target(project, fullName);
+        var remote = Target(project, fullName, host);
         var newUrl = RemoteUrlRewriter.Rewrite(remote.Url.Url, newOwner, newName);
         return await git.SetRemoteUrlAsync(project.Path, remote.Name, newUrl, ct);
     }
 
     /// <summary>Le repo n'existe plus : on retire le lien mort (les fichiers et l'historique local ne bougent pas).</summary>
-    public Task<GitResult> UnlinkAsync(LocalProject project, string? fullName = null, CancellationToken ct = default) =>
-        git.RemoveRemoteAsync(project.Path, Target(project, fullName).Name, ct);
+    public Task<GitResult> UnlinkAsync(LocalProject project, string? fullName = null, CancellationToken ct = default, string? host = null) =>
+        git.RemoveRemoteAsync(project.Path, Target(project, fullName, host).Name, ct);
 
     /// <summary>
     /// Une branche a été renommée sur GitHub (ex. master → main) : récupère la nouvelle, renomme la branche
@@ -46,7 +55,7 @@ public sealed class LinkedProjects(GitService git, GitCredentialResolver credent
     public async Task<IReadOnlyList<GitResult>> FollowBranchRenameAsync(LocalProject project, GitHubAccount? account, string from, string to,
         string? fullName = null, bool isDefault = true, CancellationToken ct = default)
     {
-        var target = Target(project, fullName);
+        var target = Target(project, fullName, account?.Host);
         var remote = target.Name;
         var steps = new List<GitResult>();
         var auth = await credentials.EnvironmentForAsync(account, target.Url, ct);

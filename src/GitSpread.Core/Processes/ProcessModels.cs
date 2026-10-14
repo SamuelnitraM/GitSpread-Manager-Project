@@ -15,9 +15,15 @@ public sealed record ProcessRequest(string FileName, IReadOnlyList<string> Argum
     /// <summary>Appelé (sur un thread d'arrière-plan) à chaque morceau de sortie, stdout ou stderr, au fil de l'eau.</summary>
     public Action<string>? OutputReceived { get; init; }
 
+    /// <summary>Arguments secrets (ex. phrase secrète d'une clé SSH) : remplacés par *** dans <see cref="CommandLine"/>.</summary>
+    public IReadOnlyCollection<string> Secrets { get; init; } = [];
+
     /// <summary>Ligne de commande lisible, pour les logs et la prévisualisation (à masquer avant affichage).</summary>
     public string CommandLine =>
-        string.Join(' ', Arguments.Select(a => a.Length == 0 || a.Any(char.IsWhiteSpace) ? $"\"{a}\"" : a).Prepend(FileName));
+        string.Join(' ', Arguments
+            .Select(a => a.Length > 0 && Secrets.Contains(a) ? "***" : a)
+            .Select(a => a.Length == 0 || a.Any(char.IsWhiteSpace) ? $"\"{a}\"" : a)
+            .Prepend(FileName));
 }
 
 public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError, bool TimedOut = false)

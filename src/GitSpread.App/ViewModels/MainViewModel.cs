@@ -87,7 +87,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
 
     // ------------------------------------------------------------ paramètres (F6d)
 
-    private readonly HashSet<TabViewModel> _startViewShown = [];
+    private readonly HashSet<string> _startViewShown = []; // clés des onglets déjà ouverts sur la vue principale
 
     partial void OnSelectedTabChanged(TabViewModel? value) => ShowStartView(value);
 
@@ -95,7 +95,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
     /// (« Retour aux projets » ramène à la liste, qui reste ensuite affichée).</summary>
     private void ShowStartView(TabViewModel? tab)
     {
-        if (tab is null || Settings.MainView != MainViews.History || !_startViewShown.Add(tab) || tab.IsExplorerOpen) return;
+        if (tab is null || Settings.MainView != MainViews.History || !_startViewShown.Add(tab.Key) || tab.IsExplorerOpen) return;
         tab.OpenExplorer();
     }
 
@@ -106,7 +106,10 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         ShowHistoryPreview = Settings.ShowHistoryPreview;
         HistoryPreviewHeight = Math.Max(110, Settings.HistoryPreviewHeight);
         foreach (var tab in Tabs)
+        {
             if (tab.History is { } history) history.PageSize = Settings.HistoryPageSize;
+            if (tab.Explorer is { } explorer) explorer.History.PageSize = Settings.HistoryPageSize;
+        }
         if (mainViewChanged)
         {
             _startViewShown.Clear();
@@ -210,6 +213,8 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         }
     }
 
+    private const string ScanErrorPrefix = "Analyse des dossiers de projets impossible : ";
+
     /// <summary>Relance uniquement l'analyse des dossiers (après un changement de dossiers par exemple).</summary>
     public async Task ScanAsync()
     {
@@ -221,7 +226,13 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
             _scanStatus = $"{result.Projects.Count} projet{(result.Projects.Count > 1 ? "s" : "")} trouvé{(result.Projects.Count > 1 ? "s" : "")} en {result.Duration.TotalMilliseconds:0} ms"
                 + (result.MissingRoots.Count > 0 ? $" · dossier introuvable : {string.Join(", ", result.MissingRoots)}" : "");
             _logger.LogInformation("Scan : {Count} projets en {Ms} ms", result.Projects.Count, (int)result.Duration.TotalMilliseconds);
+            if (GlobalError?.StartsWith(ScanErrorPrefix, StringComparison.Ordinal) == true) GlobalError = null;
             DistributeProjects();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Analyse des dossiers impossible");
+            GlobalError = $"{ScanErrorPrefix}{e.Message}";
         }
         finally
         {
@@ -424,10 +435,15 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
     private void DistributeProjects()
     {
         // Le compte rendu de la dernière action survit à la nouvelle analyse (ex. « Initialiser git » change l'état du projet).
-        var previousLogs = Tabs.SelectMany(t => t.Projects).Where(p => p.LastAction is not null)
+        var previousLogs = Tabs.SelectMany(t => t.AllProjects).Where(p => p.LastAction is not null)
             .GroupBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().LastAction, StringComparer.OrdinalIgnoreCase);
-        ProjectItemViewModel Item(ProjectPlacement p, GitHubAccount? viewer) =>
-            new(p, this) { ViewingAccount = viewer, LastAction = previousLogs.GetValueOrDefault(p.Project.Path) };
+        // Un projet dont une action est en cours garde son objet : l'action ne peut pas être relancée en double,
+        // et son compte rendu s'affiche bien à la fin (il serait sinon écrit sur un objet qui n'est plus affiché).
+        var busy = Tabs.SelectMany(t => t.AllProjects.Select(p => (Tab: t, Project: p))).Where(x => x.Project.IsBusy)
+            .ToDictionary(x => (x.Tab, x.Project.Path.ToLowerInvariant()), x => x.Project);
+        ProjectItemViewModel Item(TabViewModel tab, ProjectPlacement p, GitHubAccount? viewer) =>
+            busy.GetValueOrDefault((tab, p.Project.Path.ToLowerInvariant()))
+            ?? new(p, this) { ViewingAccount = viewer, LastAction = previousLogs.GetValueOrDefault(p.Project.Path) };
 
         // Un projet partagé apparaît chez son propriétaire, chez chaque collaborateur connecté (F3A) et chez le compte de chaque lien secondaire (F3B).
         var collaborations = new CollaborationIndex();
@@ -439,8 +455,8 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         foreach (var tab in AccountTabs)
             tab.SetProjects(placements
                 .Where(p => p.BelongsTo(tab.Account))
-                .Select(p => Item(p, tab.Account)));
-        _unlinked.SetProjects(placements.Where(p => p.Reason is not null).Select(p => Item(p, null)));
+                .Select(p => Item(tab, p, tab.Account)));
+        _unlinked.SetProjects(placements.Where(p => p.Reason is not null).Select(p => Item(_unlinked, p, null)));
     }
 
     private void UpdateStatus()

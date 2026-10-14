@@ -119,6 +119,7 @@ public sealed partial class ProjectItemViewModel
     /// <summary>Assistant « Ajouter un lien » : un repo (nouveau ou existant) d'un compte, en plus du lien actuel.</summary>
     public async Task OpenAddLinkAsync(Core.Accounts.GitHubAccount? account)
     {
+        await EnsureDetailsAsync();
         var dialog = new RepointViewModel(this, host, account, addLink: true);
         host.Dialogs.ShowRepoint(dialog);
         if (!dialog.Done) return;

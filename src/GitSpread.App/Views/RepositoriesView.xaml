@@ -13,7 +13,8 @@
     <DockPanel Grid.Column="0">
         <DockPanel DockPanel.Dock="Top" Margin="16,12,16,10">
             <CheckBox DockPanel.Dock="Right" Content="Afficher les archivés" VerticalAlignment="Center" IsChecked="{Binding ShowArchived}" Margin="16,0,0,0" />
-            <TextBlock DockPanel.Dock="Right" Text="{Binding RepositoriesSummary}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="16,0,0,0" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding RepositoriesSummary}" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="16,0,0,0"
+                       TextTrimming="CharacterEllipsis" MaxWidth="360" ToolTip="{Binding RepositoriesSummary}" />
             <Grid MaxWidth="340" HorizontalAlignment="Left">
                 <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" Padding="26,5,6,5" VerticalContentAlignment="Center"
                          BorderBrush="{DynamicResource Border}" MinWidth="240" />
@@ -62,8 +63,8 @@
             </StackPanel>
         </Border>
         <Border DockPanel.Dock="Top" Margin="16,0,16,10" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Border}" BorderThickness="1"
-                CornerRadius="6" Padding="12,8" Visibility="{Binding HasInvitationMessage, Converter={StaticResource BoolToVisibility}}">
-            <TextBox Text="{Binding InvitationMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                CornerRadius="6" Padding="12,8" Visibility="{Binding HasNotice, Converter={StaticResource BoolToVisibility}}">
+            <TextBox Text="{Binding Notice, Mode=OneWay}" Style="{StaticResource SelectableText}" />
         </Border>
 
         <Border DockPanel.Dock="Top" Margin="16,0,16,10" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="12,8"
@@ -132,7 +133,7 @@
             <TextBlock Text="Aucun repo à afficher." Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Visibility="{Binding HasNoRepositories, Converter={StaticResource BoolToVisibility}}" />
             <TextBlock Text="Chargement des repos…" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Visibility="{Binding IsLoadingRepositories, Converter={StaticResource BoolToVisibility}}" />
+                       Visibility="{Binding ShowLoadingRepositories, Converter={StaticResource BoolToVisibility}}" />
         </Grid>
     </DockPanel>
 
@@ -179,7 +180,7 @@
                         <TextBlock Text="{Binding Details.Description}" TextWrapping="Wrap" Margin="0,10,0,0"
                                    Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}" />
                         <TextBlock Margin="0,4,0,0" Visibility="{Binding HasHomepage, Converter={StaticResource BoolToVisibility}}">
-                            <Hyperlink NavigateUri="{Binding Details.Homepage}" RequestNavigate="Homepage_RequestNavigate"><Run Text="{Binding Details.Homepage, Mode=OneWay}" /></Hyperlink>
+                            <Hyperlink Click="Homepage_Click"><Run Text="{Binding Details.Homepage, Mode=OneWay}" /></Hyperlink>
                         </TextBlock>
                         <ItemsControl ItemsSource="{Binding Topics}" Margin="-6,8,0,0" Visibility="{Binding HasTopics, Converter={StaticResource BoolToVisibility}}">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -217,7 +218,7 @@
                         <Expander Style="{StaticResource Section}" Header="BRANCHES" IsExpanded="{Binding Sections.RepoBranches}">
                             <StackPanel>
                                 <TextBlock Text="{Binding BranchesLabel}" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
-                                <ItemsControl ItemsSource="{Binding Branches}" Margin="0,2,0,0">
+                                <ItemsControl x:Name="GitHubBranches" ItemsSource="{Binding Branches}" Margin="0,2,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type vm:GitHubBranchRow}">
                                             <DockPanel Margin="0,5,0,0">
@@ -300,7 +301,7 @@
                                 <TextBlock Text="{Binding CollaboratorsNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" />
                             </StackPanel>
                         </Expander>
-                        <Expander Style="{StaticResource Section}" Header="ZONE SENSIBLE" IsExpanded="{Binding Sections.RepoDanger}">
+                        <Expander Style="{StaticResource Section}" Header="ZONE SENSIBLE · renommer, visibilité, archiver, transférer, supprimer" IsExpanded="{Binding Sections.RepoDanger}">
                             <StackPanel>
                                 <Border Margin="0,6,0,0" Background="{DynamicResource DangerSoft}" BorderBrush="{DynamicResource DangerBorder}" BorderThickness="1"
                                         CornerRadius="6" Padding="10,8">

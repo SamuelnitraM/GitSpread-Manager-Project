@@ -90,6 +90,7 @@ public sealed partial class IntegrationViewModel(ProjectItemViewModel project, I
         PushTarget = PushTarget && ShowPushOption,
         DeleteSource = DeleteSource && ShowDeleteOption,
         StartDespiteConflicts = StartDespiteConflicts,
+        Remote = project.Project.RemoteName ?? "origin",
     };
 
     private void Refresh()

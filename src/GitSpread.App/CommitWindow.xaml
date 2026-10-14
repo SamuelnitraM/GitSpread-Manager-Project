@@ -36,25 +36,30 @@
                 <Run Text="Commit dans " /><Run Text="{Binding ProjectName, Mode=OneWay}" />
             </TextBlock>
 
-            <Border Grid.Row="1" Background="{DynamicResource WarningSoft}" CornerRadius="6" Padding="10,8" Margin="0,0,0,10"
-                    Visibility="{Binding ShowGitignoreAdvice, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Warning}"
-                               Text="Ce projet n'a pas de .gitignore. Les dossiers de dépendances (node_modules, vendor, bin...) sont décochés : inutile de les envoyer sur GitHub. Un .gitignore les écarte définitivement." />
-                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0"
-                            Content="{Binding AddGitignoreLabel}" Command="{Binding AddGitignoreCommand}"
-                            Visibility="{Binding CanAddGitignore, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-            </Border>
-            <TextBlock Grid.Row="1" Text="{Binding GitignoreResult}" Foreground="{DynamicResource Success}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,8">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding ShowGitignoreAdvice}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
+            <StackPanel Grid.Row="1">
+                <Border Background="{DynamicResource WarningSoft}" CornerRadius="6" Padding="10,8" Margin="0,0,0,10"
+                        Visibility="{Binding ShowGitignoreAdvice, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Warning}"
+                                   Text="Ce projet n'a pas de .gitignore. Les dossiers de dépendances (node_modules, vendor, bin...) sont décochés : inutile de les envoyer sur GitHub. Un .gitignore les écarte définitivement." />
+                        <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                Content="{Binding AddGitignoreLabel}" Command="{Binding AddGitignoreCommand}"
+                                Visibility="{Binding CanAddGitignore, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
+                <!-- Résultat de « Ajouter un .gitignore » : visible même si le conseil reste affiché (échec), en orange si c'est un échec -->
+                <TextBlock Text="{Binding GitignoreResult}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,8" VerticalAlignment="Bottom"
+                           Visibility="{Binding HasGitignoreResult, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource Success}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding GitignoreFailed}" Value="True"><Setter Property="Foreground" Value="{DynamicResource Warning}" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
 
             <DockPanel Grid.Row="2" Margin="0,0,0,6">
                 <TextBlock DockPanel.Dock="Right"><Hyperlink Command="{Binding ToggleAllCommand}">Tout cocher / décocher</Hyperlink></TextBlock>
@@ -68,7 +73,7 @@
                         <DataTemplate DataType="{x:Type vm:ChangeItemViewModel}">
                             <DockPanel Margin="2,3">
                                 <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Border DockPanel.Dock="Left" Width="104" CornerRadius="10" Padding="7,1" Margin="0,0,10,0" HorizontalAlignment="Left">
+                                <Border DockPanel.Dock="Left" Width="104" CornerRadius="10" Padding="7,1" Margin="0,0,10,0" HorizontalAlignment="Left" VerticalAlignment="Center">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{DynamicResource WarningSoft}" />
@@ -130,8 +135,19 @@
                 <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,6,0,0" Content="C'est bien mon adresse"
                                 Command="{Binding ConfirmEmailCommand}" Visibility="{Binding CanConfirmEmail, Converter={StaticResource BoolToVisibility}}"
                                 ToolTip="GitSpread s'en souviendra pour ce compte et ne t'avertira plus" />
-                <TextBlock Text="{Binding DataContext.IdentityResult, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="{DynamicResource Success}"
-                           TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding DataContext.IdentityResult, RelativeSource={RelativeSource AncestorType=Window}}"
+                           TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource Success}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding DataContext.IdentityFailed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
 
             <Border Grid.Row="6" Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">

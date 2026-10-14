@@ -100,7 +100,7 @@
                 <TextBlock Text="Aucun projet local rattaché ici." Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
                            Visibility="{Binding HasNoProjects, Converter={StaticResource BoolToVisibility}}" />
                 <TextBlock Text="Analyse des dossiers…" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}" />
+                           Visibility="{Binding ShowScanning, Converter={StaticResource BoolToVisibility}}" />
             </Grid>
         </DockPanel>
 
@@ -287,6 +287,11 @@
                         <Border Margin="0,14,0,0" Background="{DynamicResource DangerSoft}" CornerRadius="6" Padding="10,6"
                                 Visibility="{Binding HasDetailsError, Converter={StaticResource BoolToVisibility}}">
                             <TextBox Text="{Binding DetailsError, Mode=OneWay}" Style="{StaticResource SelectableText}" Foreground="{DynamicResource Danger}" />
+                        </Border>
+                        <!-- Sécurité : programmes déclarés par la configuration locale du dépôt -->
+                        <Border Margin="0,14,0,0" Background="{DynamicResource WarningSoft}" CornerRadius="6" Padding="10,6"
+                                Visibility="{Binding ProgramsWarning, Converter={StaticResource NullToCollapsed}}">
+                            <TextBlock Text="{Binding ProgramsWarning}" TextWrapping="Wrap" Foreground="{DynamicResource Warning}" />
                         </Border>
 
                         <!-- ============ Sections repliables (F6c), état mémorisé ============ -->

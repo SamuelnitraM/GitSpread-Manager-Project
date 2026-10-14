@@ -37,7 +37,7 @@ public sealed class SshKeyService(IProcessRunner runner, string? sshDirectory = 
 
         Directory.CreateDirectory(SshDirectory);
         var result = await runner.RunAsync(new ProcessRequest("ssh-keygen",
-            ["-t", "ed25519", "-C", comment, "-f", privatePath, "-N", passphrase, "-q"]), cancellationToken);
+            ["-t", "ed25519", "-C", comment, "-f", privatePath, "-N", passphrase, "-q"]) { Secrets = [passphrase] }, cancellationToken); // jamais dans les journaux
         if (!result.Succeeded)
             throw new InvalidOperationException($"ssh-keygen a échoué : {result.StandardError.Trim()}");
 

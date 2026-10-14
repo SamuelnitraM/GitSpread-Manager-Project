@@ -60,11 +60,11 @@
     </Border>
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="290" MinWidth="220" />
+            <ColumnDefinition Width="290" MinWidth="200" />
             <ColumnDefinition Width="5" />
-            <ColumnDefinition Width="*" MinWidth="380" />
+            <ColumnDefinition Width="*" MinWidth="280" />
             <ColumnDefinition Width="5" />
-            <ColumnDefinition Width="440" MinWidth="300" />
+            <ColumnDefinition Width="440" MinWidth="280" />
         </Grid.ColumnDefinitions>
 
         <!-- ============ Gauche : projets et branches ============ -->
@@ -220,6 +220,12 @@
 
         <!-- ============ Droite : commit choisi ============ -->
         <Border Grid.Column="4" Background="{DynamicResource Surface}" DataContext="{Binding History}">
+            <DockPanel>
+            <!-- Commit illisible ou suite de l'historique illisible : en haut de la colonne, sans masquer le graphe ni le commit -->
+            <Border DockPanel.Dock="Top" Margin="16,12,16,0" Background="{DynamicResource WarningSoft}" CornerRadius="6" Padding="10,8"
+                    Visibility="{Binding DetailsError, Converter={StaticResource NullToCollapsed}}">
+                <TextBlock Text="{Binding DetailsError}" TextWrapping="Wrap" Foreground="{DynamicResource Warning}" />
+            </Border>
             <Grid>
                 <TextBlock Text="Choisis un commit dans l'historique pour voir ce qu'il a changé." Foreground="{DynamicResource Muted}" TextWrapping="Wrap"
                            TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
@@ -415,8 +421,17 @@
                                     Visibility="{Binding CanRestoreFile, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Remet ce fichier comme il était à ce commit. L'historique ne change pas : la restauration sera un changement à commiter." />
                         </WrapPanel>
-                        <TextBlock Text="{Binding FileStatus}" Foreground="{DynamicResource Success}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
-                                   Visibility="{Binding FileStatus, Converter={StaticResource NullToCollapsed}}" />
+                        <TextBlock Text="{Binding FileStatus}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Visibility="{Binding FileStatus, Converter={StaticResource NullToCollapsed}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource Success}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding FileStatusFailed}" Value="True"><Setter Property="Foreground" Value="{DynamicResource Warning}" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+                        </TextBlock>
                         <TextBlock Text="{Binding ContentNote}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
                                    Visibility="{Binding ContentNoteShown, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
@@ -506,6 +521,7 @@
                 </StackPanel>
                 </ScrollViewer>
             </Grid>
+            </DockPanel>
         </Border>
     </Grid>
     </DockPanel>

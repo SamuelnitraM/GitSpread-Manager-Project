@@ -13,7 +13,7 @@ public class GitCredentialEnvironmentTests
     {
         var env = GitCredentialEnvironment.For("SamuelnitraM", Token);
 
-        Assert.Equal("2", env["GIT_CONFIG_COUNT"]);
+        Assert.Equal("7", env["GIT_CONFIG_COUNT"]);
         Assert.Equal("credential.helper", env["GIT_CONFIG_KEY_0"]);
         Assert.Equal("", env["GIT_CONFIG_VALUE_0"]);
         Assert.Equal("http.https://github.com/.extraHeader", env["GIT_CONFIG_KEY_1"]);
@@ -22,6 +22,10 @@ public class GitCredentialEnvironmentTests
         Assert.StartsWith("Authorization: Basic ", header);
         var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header["Authorization: Basic ".Length..]));
         Assert.Equal($"SamuelnitraM:{Token}", decoded);
+
+        // Le jeton n'est jamais envoyé sans vérifier le certificat, même si la config du dépôt le désactive.
+        Assert.Equal(("http.sslVerify", "true"), (env["GIT_CONFIG_KEY_2"], env["GIT_CONFIG_VALUE_2"]));
+        Assert.Equal(("http.https://github.com/.sslVerify", "true"), (env["GIT_CONFIG_KEY_3"], env["GIT_CONFIG_VALUE_3"]));
     }
 
     [Fact]
@@ -67,7 +71,8 @@ public class GitCredentialResolverTests
 
         var env = await Create(runner).EnvironmentForAsync(Account, RemoteUrlParser.Parse("https://github.com/SamuelnitraM/x.git"));
 
-        Assert.Equal("2", env["GIT_CONFIG_COUNT"]);
+        Assert.Equal("8", env["GIT_CONFIG_COUNT"]); // dont la vérification du certificat sur l'adresse exacte du dépôt
+        Assert.Equal("http.https://github.com/SamuelnitraM/x.git.sslVerify", env["GIT_CONFIG_KEY_7"]);
         Assert.Contains("--user", runner.Requests[0].Arguments);
     }
 

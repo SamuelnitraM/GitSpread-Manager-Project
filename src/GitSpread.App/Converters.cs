@@ -73,6 +73,33 @@ public sealed class FileToImageConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>Visibilité d'un repo en français (Privé, Public, Interne).</summary>
+public sealed class VisibilityLabelConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    {
+        Core.GitHub.RepositoryVisibility.Private => "Privé",
+        Core.GitHub.RepositoryVisibility.Internal => "Interne",
+        Core.GitHub.RepositoryVisibility.Public => "Public",
+        _ => "",
+    };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Nombre diminué de <see cref="Amount"/> (ex. largeur disponible moins la place d'un bouton).</summary>
+public sealed class MinusConverter : IValueConverter
+{
+    public double Amount { get; set; }
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is double d ? Math.Max(0, d - Amount) : double.PositiveInfinity;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Masqué quand la valeur est null (ou une chaîne vide).</summary>
 public sealed class NullToCollapsedConverter : IValueConverter
 {

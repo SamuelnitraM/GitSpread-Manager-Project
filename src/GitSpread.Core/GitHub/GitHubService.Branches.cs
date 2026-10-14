@@ -52,7 +52,7 @@ public sealed partial class GitHubService
             return new GitHubBranch(
                 n.GetProperty("name").GetString()!,
                 Str(target, "oid") ?? "",
-                Str(target, "committedDate") is { } d && DateTimeOffset.TryParse(d, out var date) ? date : null,
+                Str(target, "committedDate") is { } d && DateTimeOffset.TryParse(d, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null,
                 Str(target, "messageHeadline") ?? "",
                 target.ValueKind == JsonValueKind.Object && target.TryGetProperty("author", out var a) ? Str(a, "name") : null,
                 NotInDefault: Count("behindBy"),
@@ -62,5 +62,5 @@ public sealed partial class GitHubService
 
     /// <summary>Supprime une branche sur GitHub (refusé par GitHub pour la branche par défaut ou une branche protégée).</summary>
     public async Task DeleteBranchAsync(GitHubAccount account, string fullName, string branch, CancellationToken ct = default) =>
-        await gh.RunCheckedAsync(["api", "--method", "DELETE", $"repos/{fullName}/git/refs/heads/{branch}"], await EnvironmentForAsync(account, ct), ct);
+        await gh.RunCheckedAsync(["api", "--method", "DELETE", $"repos/{RepoPath(fullName)}/git/refs/heads/{BranchPath(branch)}"], await EnvironmentForAsync(account, ct), ct);
 }

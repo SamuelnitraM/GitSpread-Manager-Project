@@ -81,7 +81,7 @@ public sealed partial class GitService(IProcessRunner runner)
         var result = await RunAsync(repositoryPath, ["log", "-1", "--format=%H%x1f%h%x1f%an%x1f%ae%x1f%aI%x1f%s"], null, cancellationToken);
         if (!result.Succeeded) return null; // dépôt sans commit
         var parts = result.StandardOutput.TrimEnd('\r', '\n').Split('\x1f');
-        return parts.Length == 6 && DateTimeOffset.TryParse(parts[4], out var date)
+        return parts.Length == 6 && DateTimeOffset.TryParse(parts[4], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
             ? new CommitInfo(parts[0], parts[1], parts[2], parts[3], date, parts[5])
             : null;
     }
@@ -122,12 +122,12 @@ public sealed partial class GitService(IProcessRunner runner)
         if (string.IsNullOrWhiteSpace(message)) throw new ArgumentException("Le message de commit est obligatoire.", nameof(message));
 
         var all = paths is null || paths.Count == 0;
-        var add = await ActAsync(repositoryPath, all ? ["add", "--all"] : ["add", "--all", "--", .. paths!], null, cancellationToken);
+        var add = await ActAsync(repositoryPath, all ? ["add", "--all"] : ["add", "--all", "--", .. paths!.Select(Literal)], null, cancellationToken);
         if (!add.Succeeded) return [add];
 
         List<string> commit = ["commit", "-m", message.Trim()];
         if (allowEmpty) commit.Add("--allow-empty");
-        if (!all) commit.AddRange(["--", .. paths!]);
+        if (!all) commit.AddRange(["--", .. paths!.Select(Literal)]);
         return [add, await ActAsync(repositoryPath, commit, null, cancellationToken)];
     }
 
@@ -247,14 +247,94 @@ public sealed partial class GitService(IProcessRunner runner)
 
     // ------------------------------------------------------------ exécution
 
-    private Task<ProcessResult> RunAsync(string directory, IReadOnlyList<string> args,
-        IReadOnlyDictionary<string, string>? auth, CancellationToken ct, TimeSpan? timeout = null) =>
-        runner.RunAsync(new ProcessRequest(Executable, ["--no-optional-locks", "-c", "core.quotepath=false", .. args])
+    /// <summary>
+    /// Options ajoutées à chaque commande git. Pas de « fsmonitor » : un dépôt reçu d'ailleurs ne peut pas lancer de
+    /// programme quand GitSpread lit son état.
+    /// </summary>
+    internal static readonly IReadOnlyList<string> CommonOptions =
+        ["--no-optional-locks", "-c", "core.quotepath=false", "-c", "core.fsmonitor=false"];
+
+    /// <summary>
+    /// Chemin de fichier pris tel quel, jamais comme un motif : « [id].tsx » ne désigne pas aussi « i.tsx ».
+    /// (Pas d'option --literal-pathspecs globale : elle empêche « git stash -u » de ranger les fichiers non suivis.)
+    /// </summary>
+    internal static string Literal(string path) => ":(literal)" + path;
+
+    private async Task<ProcessResult> RunAsync(string directory, IReadOnlyList<string> args,
+        IReadOnlyDictionary<string, string>? auth, CancellationToken ct, TimeSpan? timeout = null)
+    {
+        // Un clone se fait dans un dossier parent : la config d'un éventuel dépôt englobant ne le concerne pas.
+        if (args is not ["clone", ..]) await EnsureTokenStaysWithGitHubAsync(directory, auth, ct);
+        return await runner.RunAsync(Request(directory, args, auth, timeout), ct);
+    }
+
+    /// <summary>Refuse d'envoyer le jeton si le dépôt détourne lui-même la connexion (voir <see cref="NetworkOverrideAsync"/>).</summary>
+    private async Task EnsureTokenStaysWithGitHubAsync(string directory, IReadOnlyDictionary<string, string>? auth, CancellationToken ct)
+    {
+        if (auth is null || !auth.Values.Any(v => v.StartsWith("Authorization:", StringComparison.Ordinal))) return;
+        if (await NetworkOverrideAsync(directory, ct) is { } key)
+            throw new GitCommandException(
+                $"Ce dépôt modifie lui-même ses réglages de connexion ({key} dans sa configuration) : GitSpread n'y envoie pas ton jeton GitHub. "
+                + "Si tu n'as pas fait ce réglage toi-même, ce dossier n'est pas fiable.",
+                new ProcessResult(-1, "", $"réglage réseau local : {key}"));
+    }
+
+    /// <summary>
+    /// Réglage réseau déclaré par la configuration du dépôt lui-même (proxy, certificats, redirection d'adresse, vérification
+    /// du certificat désactivée) : il pourrait envoyer le jeton à un autre serveur. Les fichiers inclus par le dépôt comptent
+    /// aussi ; les réglages du poste (config globale) non. Null si aucun.
+    /// </summary>
+    private async Task<string?> NetworkOverrideAsync(string directory, CancellationToken ct)
+    {
+        if ((await RepositoryConfigAsync(directory,
+                @"^http\.(.*\.)?(proxy|proxysslcainfo|sslcainfo|sslcapath|sslbackend|schannelusesslcainfo|sslcert|sslkey|curloptresolve)$|^remote\..*\.proxy$", ct) ?? [])
+            .FirstOrDefault() is { Key: { } key }) return key;
+        // sslVerify n'est un problème que s'il désactive la vérification : git interprète lui-même la valeur (« 0k », « off », clé seule…).
+        // Une valeur illisible (même pour une autre adresse) rend la lecture impossible : on refuse plutôt que de supposer.
+        return await RepositoryConfigAsync(directory, @"^http\.(.*\.)?sslverify$", ct, asBoolean: true) is { } verify
+            ? verify.FirstOrDefault(c => c.Value == "false").Key
+            : "http.sslVerify (valeur illisible)";
+    }
+
+    /// <summary>
+    /// Réglages déclarés par le dépôt lui-même (.git/config, fichiers qu'il inclut, config de worktree), à l'exclusion de ceux
+    /// du poste et de ceux que GitSpread passe en ligne de commande. Lire la configuration ne lance rien.
+    /// </summary>
+    /// <param name="asBoolean">Valeurs lues comme des booléens par git (« true » ou « false ») ; null si git ne peut pas les lire.</param>
+    internal async Task<IReadOnlyList<(string Key, string Value)>?> RepositoryConfigAsync(string directory, string keyPattern, CancellationToken ct,
+        bool asBoolean = false)
+    {
+        // -z : « portée\0clé\nvaleur\0 », sans ambiguïté même si l'adresse d'une clé contient des espaces.
+        var r = await runner.RunAsync(Request(directory, asBoolean
+            ? ["config", "--show-scope", "-z", "--type=bool", "--get-regexp", keyPattern]
+            : ["config", "--show-scope", "-z", "--get-regexp", keyPattern], null), ct);
+        if (r.ExitCode == 1) return []; // aucun réglage
+        if (!r.Succeeded) return asBoolean ? null : []; // valeur illisible, ou pas un dépôt
+        var fields = r.StandardOutput.Split('\0');
+        var settings = new List<(string, string)>();
+        for (var i = 0; i + 1 < fields.Length; i += 2)
+        {
+            if (fields[i] is not ("local" or "worktree")) continue;
+            var entry = fields[i + 1];
+            var newline = entry.IndexOf('\n');
+            settings.Add(newline < 0 ? (entry, "") : (entry[..newline], entry[(newline + 1)..]));
+        }
+        return settings;
+    }
+
+    /// <summary>Requête git avec les options communes. Un dossier de projet disparu donne une erreur claire.</summary>
+    internal ProcessRequest Request(string directory, IReadOnlyList<string> args, IReadOnlyDictionary<string, string>? auth, TimeSpan? timeout = null)
+    {
+        if (!Directory.Exists(directory))
+            throw new GitCommandException($"Le dossier « {directory} » n'existe plus (déplacé ou supprimé ?). Clique sur « Actualiser ».",
+                new ProcessResult(-1, "", $"dossier introuvable : {directory}"));
+        return new ProcessRequest(Executable, [.. CommonOptions, .. args])
         {
             WorkingDirectory = directory,
             Environment = auth ?? GitCredentialEnvironment.NonInteractive(),
             Timeout = timeout ?? TimeSpan.FromSeconds(30),
-        }, ct);
+        };
+    }
 
     private async Task<GitResult> ActAsync(string directory, IReadOnlyList<string> args,
         IReadOnlyDictionary<string, string>? auth, CancellationToken ct, TimeSpan? timeout = null) =>
@@ -275,6 +355,7 @@ public sealed partial class GitService(IProcessRunner runner)
             : $"git {string.Join(' ', args)} a échoué : {error.Split('\n')[0]}", result);
     }
 
+    // Commande telle qu'on la taperait : la marque « :(literal) » des chemins est retirée pour rester lisible.
     private static string Display(IEnumerable<string> args) =>
-        "git " + string.Join(' ', args.Select(a => a.Length == 0 || a.Any(c => char.IsWhiteSpace(c) || c == '"') ? $"\"{a.Replace("\"", "\\\"")}\"" : a));
+        "git " + string.Join(' ', args.Select(a => a.StartsWith(":(literal)", StringComparison.Ordinal) ? a[10..] : a).Select(a => a.Length == 0 || a.Any(c => char.IsWhiteSpace(c) || c == '"') ? $"\"{a.Replace("\"", "\\\"")}\"" : a));
 }

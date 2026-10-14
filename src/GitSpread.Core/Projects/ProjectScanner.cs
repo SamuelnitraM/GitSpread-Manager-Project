@@ -103,7 +103,9 @@ public sealed class ProjectScanner
 
             foreach (var child in children)
             {
-                if (child.Name.StartsWith('.') || child.Name.StartsWith('$') || excluded.Contains(child.Name)) continue;
+                if (child.Name.StartsWith('.') || child.Name.StartsWith('$')) continue;
+                // Un dossier exclu (build, dist, vendor…) est ignoré, sauf s'il est lui-même un projet git.
+                if (excluded.Contains(child.Name) && !Path.Exists(Path.Combine(child.FullName, ".git"))) continue;
                 if (child.Attributes.HasFlag(FileAttributes.ReparsePoint) || child.Attributes.HasFlag(FileAttributes.System)) continue;
                 Walk(child, depth + 1);
             }

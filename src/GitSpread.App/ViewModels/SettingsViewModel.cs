@@ -329,6 +329,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Services.Cache.Clear();
             AdvancedStatus = "Copies légères supprimées : elles seront refaites à la prochaine ouverture d'un historique.";
         }
+        catch (InvalidOperationException e) { AdvancedStatus = e.Message; }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             AdvancedStatus = $"Une copie est en cours d'utilisation, réessaie dans un instant ({e.Message}).";

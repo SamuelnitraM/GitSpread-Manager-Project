@@ -274,6 +274,31 @@ public sealed class BranchTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_merge_brings_the_user_back_to_their_branch_with_their_changes()
+    {
+        await _repo.WithCommitAsync(); // main
+        await _repo.Git("switch", "-q", "--orphan", "etrangere"); // historique sans rapport : git refuse la fusion
+        await _repo.CommitFileAsync("autre.txt", "a", "Autre histoire");
+        await _repo.Git("switch", "-q", "-c", "travail", "main");
+        await _repo.CommitFileAsync("t.txt", "t", "travail");
+        _repo.Write("brouillon.txt", "pas encore commité");
+
+        var refused = await Assert.ThrowsAsync<GitCommandException>(() => _integrator.AnalyzeAsync(P, "etrangere", "main"));
+        Assert.Contains("aucun commit en commun", refused.Message); // l'assistant l'affiche comme un blocage
+
+        // Même échec au moment de fusionner (après être passé sur main) : retour sur la branche de départ.
+        await _repo.Git("branch", "proche", "main");
+        var analysis = await _integrator.AnalyzeAsync(P, "proche", "main");
+        var result = await _integrator.IntegrateAsync(P, analysis with { Source = "etrangere", SourceRef = "etrangere", Kind = IntegrationKind.Merge, WorkingTreeDirty = true },
+            new IntegrationOptions { StashChanges = true });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("travail", await Current()); // revenu sur sa branche…
+        Assert.Equal("pas encore commité", File.ReadAllText(Path.Combine(P, "brouillon.txt"))); // …avec ses modifications
+        Assert.Null(await _git.FindStashForBranchAsync(P, "travail"));
+    }
+
+    [Fact]
     public async Task Main_behind_github_is_caught_up_first_then_pushed()
     {
         var bare = await _repo.BareAsync();

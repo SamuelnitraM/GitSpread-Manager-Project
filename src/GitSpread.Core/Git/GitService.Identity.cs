@@ -31,6 +31,26 @@ public sealed partial class GitService
             global is { Name: null, Email: null } ? null : global);
     }
 
+    /// <summary>
+    /// Programmes que git exécuterait pour ce dépôt, déclarés dans sa configuration locale (.git/config) : filtres,
+    /// pilotes de fusion ou de comparaison, hooks déplacés. Un dépôt créé ou cloné normalement n'en a pas (sauf outils
+    /// comme git-crypt) ; un dossier .git reçu tel quel (archive, clé USB) peut en cacher. La lecture ne lance rien.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListRepositoryProgramsAsync(string repositoryPath, CancellationToken ct = default)
+    {
+        // Noms seuls (--name-only) : un nom peut contenir des espaces (« diff.Mon Outil.textconv »). Fichiers inclus compris.
+        var r = await RunAsync(repositoryPath, ["config", "--show-scope", "--name-only", "--get-regexp",
+            @"^(filter|merge|diff)\..*\.(clean|smudge|process|driver|command|textconv)$"
+            + @"|^core\.(hookspath|fsmonitor|pager|editor|sshcommand|askpass|gitproxy)$|^credential\..*helper$|^gpg\.(.*\.)?program$"
+            + @"|^remote\..*\.(uploadpack|receivepack)$"], null, ct);
+        return r.Succeeded
+            ? r.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(l => l.TrimEnd('\r').Split('\t', 2))
+                .Where(p => p.Length == 2 && p[0] is "local" or "worktree")
+                .Select(p => p[1].Trim()).Distinct().ToList()
+            : [];
+    }
+
     /// <summary>Identité globale du poste (git config --global), utilisée par tous les projets sans réglage propre.</summary>
     public async Task<GitIdentity> GetGlobalIdentityAsync(CancellationToken ct = default)
     {
@@ -76,7 +96,7 @@ public sealed partial class GitService
     /// <summary>Commits de la branche courante qui ne sont sur aucune branche distante connue (du plus ancien au plus récent).</summary>
     public async Task<IReadOnlyList<UnpushedCommit>> ListUnpushedCommitsAsync(string repositoryPath, CancellationToken ct = default)
     {
-        var r = await RunAsync(repositoryPath, ["log", "--reverse", "--topo-order", "--format=%H%x1f%an%x1f%ae%x1f%s", "HEAD", "--not", "--remotes"], null, ct);
+        var r = await RunAsync(repositoryPath, ["log", "--reverse", "--topo-order", "--format=%H%x1f%an%x1f%ae%x1f%s", "HEAD", "--not", "--remotes", "--"], null, ct);
         if (!r.Succeeded) return []; // dépôt sans commit
         return r.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => l.TrimEnd('\r').Split('\x1f'))
@@ -108,7 +128,7 @@ public sealed partial class GitService
 
         // Garde-fou : tout ce que la réécriture toucherait doit être non poussé.
         string[] range = onto is null ? ["HEAD"] : [$"{onto}..HEAD"];
-        var touched = (await ReadAsync(repositoryPath, ["rev-list", .. range], ct)).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim());
+        var touched = (await ReadAsync(repositoryPath, ["rev-list", .. range, "--"], ct)).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim());
         var unpushedShas = unpushed.Select(c => c.Sha).ToHashSet();
         if (touched.Any(sha => !unpushedShas.Contains(sha)))
             throw new InvalidOperationException("L'historique local mélange commits envoyés et non envoyés (fusion d'une branche distante) : GitSpread ne peut pas re-signer sans toucher à des commits déjà publiés.");
@@ -123,12 +143,7 @@ public sealed partial class GitService
         var env = new Dictionary<string, string>(GitCredentialEnvironment.NonInteractive()) { [AuthorVariable] = $"{name} <{email}>" };
         var result = new GitResult(
             $"git rebase --rebase-merges --autostash --exec \"git commit --amend --no-edit --author=…\" {onto?[..7] ?? "--root"}",
-            await runner.RunAsync(new Processes.ProcessRequest(Executable, ["--no-optional-locks", .. args])
-            {
-                WorkingDirectory = repositoryPath,
-                Environment = env,
-                Timeout = TimeSpan.FromMinutes(5),
-            }, ct));
+            await runner.RunAsync(Request(repositoryPath, args, env, TimeSpan.FromMinutes(5)), ct));
 
         // En cas d'échec, on ne laisse jamais un rebase à moitié fait.
         if (!result.Succeeded && await GetOperationAsync(repositoryPath, ct) == RepositoryOperation.Rebase)

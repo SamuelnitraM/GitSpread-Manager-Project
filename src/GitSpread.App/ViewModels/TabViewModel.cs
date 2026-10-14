@@ -31,11 +31,12 @@ public abstract partial class TabViewModel : ObservableObject
 
     public int ProjectCount => _allProjects.Count;
     public bool HasNoProjects => !IsScanning && _allProjects.Count == 0;
+    public bool ShowScanning => IsScanning && _allProjects.Count == 0;
     public bool HasSelection => SelectedProject is not null;
     public string ProjectsSummary => $"{_allProjects.Count} projet{(_allProjects.Count > 1 ? "s" : "")}";
 
     partial void OnFilterChanged(string value) => ApplyFilter();
-    partial void OnIsScanningChanged(bool value) => OnPropertyChanged(nameof(HasNoProjects));
+    partial void OnIsScanningChanged(bool value) { OnPropertyChanged(nameof(HasNoProjects)); OnPropertyChanged(nameof(ShowScanning)); }
 
     partial void OnSelectedProjectChanged(ProjectItemViewModel? oldValue, ProjectItemViewModel? newValue)
     {
@@ -46,8 +47,11 @@ public abstract partial class TabViewModel : ObservableObject
             newValue.DetailsLoaded += OnProjectDetailsLoaded;
             _ = newValue.LoadDetailsAsync();
         }
-        UpdateHistory();
+        if (!_rebuilding) UpdateHistory();
     }
+
+    // Vrai pendant la reconstruction de la liste : le projet choisi reste le même, l'aperçu ne doit pas se recharger.
+    private bool _rebuilding;
 
     public IReadOnlyList<ProjectItemViewModel> AllProjects => _allProjects;
 
@@ -87,6 +91,9 @@ public abstract partial class TabViewModel : ObservableObject
     /// <summary>Retour à l'affichage habituel de l'onglet.</summary>
     public void CloseExplorer() => Explorer = null;
 
+    /// <summary>Vrai si l'aperçu montre l'historique d'un projet local (et non celui d'un repo GitHub).</summary>
+    protected virtual bool ShowsProjectHistory => true;
+
     /// <summary>Affiche dans l'aperçu l'historique de ce qui est sélectionné dans l'onglet.</summary>
     protected virtual void UpdateHistory() => _ = History?.ShowAsync(SelectedProject);
 
@@ -101,11 +108,19 @@ public abstract partial class TabViewModel : ObservableObject
     {
         var selectedPath = SelectedProject?.Path;
         _allProjects = projects.ToList();
-        ApplyFilter();
-        SelectedProject = Projects.FirstOrDefault(p => p.Path == selectedPath);
+        _rebuilding = true;
+        try
+        {
+            ApplyFilter();
+            SelectedProject = Projects.FirstOrDefault(p => p.Path == selectedPath);
+        }
+        finally { _rebuilding = false; }
+        // Une seule relecture, sur le nouvel état du projet (même projet : le commit choisi est conservé).
+        if (ShowsProjectHistory) UpdateHistory();
         OnPropertyChanged(nameof(ProjectCount));
         OnPropertyChanged(nameof(ProjectsSummary));
         OnPropertyChanged(nameof(HasNoProjects));
+        OnPropertyChanged(nameof(ShowScanning));
         Explorer?.Refresh();
     }
 

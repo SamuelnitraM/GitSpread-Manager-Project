@@ -26,6 +26,26 @@ public sealed partial class GitHubService(GhCli gh, AccountService accounts)
 
     private const string RepoFields = "name,owner,url,sshUrl,visibility,description,isArchived,isFork,pushedAt";
 
+    /// <summary>
+    /// « propriétaire/nom » d'un repo, vérifié avant de le placer dans une adresse d'API : un nom venu d'un fichier de
+    /// configuration local (« ../ », « ? », « # »…) ne peut pas viser une autre adresse.
+    /// </summary>
+    internal static string RepoPath(string fullName) =>
+        RepoName().IsMatch(fullName) && fullName.Split('/')[1] is not ("." or "..") ? fullName : throw new ArgumentException($"Nom de repo GitHub invalide : « {fullName} ».", nameof(fullName));
+
+    /// <summary>Nom d'un compte GitHub, vérifié de même.</summary>
+    internal static string LoginPath(string login) =>
+        LoginName().IsMatch(login) ? login : throw new ArgumentException($"Nom de compte GitHub invalide : « {login} ».", nameof(login));
+
+    /// <summary>Nom de branche dans une adresse d'API : chaque partie est encodée (« fix#12 » ne s'arrête pas au « # »).</summary>
+    internal static string BranchPath(string branch) => string.Join('/', branch.Split('/').Select(Uri.EscapeDataString));
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[A-Za-z0-9_-]+/[A-Za-z0-9._-]+$")]
+    private static partial System.Text.RegularExpressions.Regex RepoName();
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[A-Za-z0-9_-]+(\[bot\])?$")]
+    private static partial System.Text.RegularExpressions.Regex LoginName();
+
     /// <summary>Version de la GitHub CLI installée (« 2.62.0 »), ou null si gh ne répond pas.</summary>
     public async Task<string?> GetCliVersionAsync(CancellationToken cancellationToken = default)
     {
@@ -92,7 +112,7 @@ public sealed partial class GitHubService(GhCli gh, AccountService accounts)
     public async Task TransferRepositoryAsync(GitHubAccount owner, string fullName, string newOwner, CancellationToken cancellationToken = default)
     {
         var env = await EnvironmentForAsync(owner, cancellationToken);
-        await gh.RunCheckedAsync(["api", "--method", "POST", $"repos/{fullName}/transfer", "-f", $"new_owner={newOwner}"], env, cancellationToken);
+        await gh.RunCheckedAsync(["api", "--method", "POST", $"repos/{RepoPath(fullName)}/transfer", "-f", $"new_owner={LoginPath(newOwner)}"], env, cancellationToken);
     }
 
     /// <summary>Noms des modèles .gitignore proposés par GitHub (Node, VisualStudio, Python...).</summary>
@@ -141,7 +161,7 @@ public sealed partial class GitHubService(GhCli gh, AccountService accounts)
                 IsArchived = e.TryGetProperty("isArchived", out var a) && a.GetBoolean(),
                 IsFork = e.TryGetProperty("isFork", out var f) && f.GetBoolean(),
                 PushedAt = e.TryGetProperty("pushedAt", out var p) && p.ValueKind == JsonValueKind.String
-                    && DateTimeOffset.TryParse(p.GetString(), out var date) ? date : null,
+                    && DateTimeOffset.TryParse(p.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null,
             })
             .ToList();
     }

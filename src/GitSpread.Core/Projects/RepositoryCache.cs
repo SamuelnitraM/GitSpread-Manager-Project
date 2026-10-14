@@ -37,13 +37,16 @@ public sealed class RepositoryCache(GitService git, GitCredentialResolver creden
         try
         {
             var auth = await credentials.EnvironmentForAsync(account, RemoteUrlParser.Parse(cloneUrl), ct);
-            if (!Directory.Exists(System.IO.Path.Combine(path, "objects")))
+            var ready = System.IO.Path.Combine(path, ReadyMarker);
+            if (!File.Exists(ready))
             {
-                if (Directory.Exists(path)) Directory.Delete(path, recursive: true); // copie interrompue : on repart de zéro
+                // Pas de copie, ou copie interrompue (clone coupé, réglage non écrit) : on repart de zéro.
+                if (Directory.Exists(path)) DeleteDirectory(path);
                 var parent = System.IO.Path.GetDirectoryName(path)!;
                 var clone = await git.CloneLightAsync(parent, cloneUrl, System.IO.Path.GetFileName(path), auth, ct);
                 if (!clone.Succeeded)
                     throw new InvalidOperationException($"Impossible de lire {fullName} sur GitHub : {clone.Explanation ?? FirstLine(clone.Output)}");
+                File.WriteAllText(ready, "copie complète\n"); // la copie n'est valide qu'une fois tout terminé
                 _fetchedAt[path] = DateTime.UtcNow;
                 return new RemoteCopy(path, auth, null);
             }
@@ -65,13 +68,31 @@ public sealed class RepositoryCache(GitService git, GitCredentialResolver creden
         : 0;
 
     /// <summary>Supprime toutes les copies : elles seront refaites à la prochaine ouverture d'un historique.</summary>
+    /// <exception cref="InvalidOperationException">Une copie est en cours de création ou de mise à jour.</exception>
     public void Clear()
     {
-        _fetchedAt.Clear();
-        if (!Directory.Exists(root)) return;
-        foreach (var file in new DirectoryInfo(root).EnumerateFiles("*", SearchOption.AllDirectories))
+        var held = new List<SemaphoreSlim>();
+        try
+        {
+            foreach (var gate in _locks.Values)
+            {
+                if (!gate.Wait(0)) throw new InvalidOperationException("Une copie est en cours de lecture sur GitHub : réessaie dans un instant.");
+                held.Add(gate);
+            }
+            _fetchedAt.Clear();
+            if (Directory.Exists(root)) DeleteDirectory(root);
+        }
+        finally { foreach (var gate in held) gate.Release(); }
+    }
+
+    /// <summary>Fichier écrit une fois la copie complète (clone et réglage terminés).</summary>
+    private const string ReadyMarker = "gitspread-copie-complete";
+
+    private static void DeleteDirectory(string path)
+    {
+        foreach (var file in new DirectoryInfo(path).EnumerateFiles("*", SearchOption.AllDirectories))
             file.Attributes = FileAttributes.Normal; // git crée ses objets en lecture seule
-        Directory.Delete(root, recursive: true);
+        Directory.Delete(path, recursive: true);
     }
 
     private static string FirstLine(string output) => output.Split('\n').FirstOrDefault(l => l.Trim().Length > 0)?.Trim() ?? "échec sans message";

@@ -133,13 +133,17 @@ public sealed partial class GitHubRepositoryViewModel
                 "Quitter le repo", destructive: true))
             return;
 
-        await RunAsync("Quitter le repo", async () =>
+        var left = await RunAsync("Quitter le repo", async () =>
         {
             await GitHub.RemoveCollaboratorAsync(Account, FullName, Account.Login);
             return new ActionLog("Quitter le repo", true, $"{Account.Login} n'est plus collaborateur de {FullName}.",
                 $"gh api --method DELETE repos/{FullName}/collaborators/{Account.Login}   (avec le compte {Account.Login})", "");
         });
-        if (LastAction is { Succeeded: true }) tab.CloseRepositoryPanel();
+        if (left is { Succeeded: true })
+        {
+            tab.CloseRepositoryPanel();
+            tab.Notice = left.Message;
+        }
         await host.ReloadCollaborationsAsync();
     }
 

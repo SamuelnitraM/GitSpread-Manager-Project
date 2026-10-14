@@ -55,7 +55,7 @@ public sealed partial class GitService
     /// <summary>Nombre de commits présents seulement dans <paramref name="a"/>, et seulement dans <paramref name="b"/>.</summary>
     public async Task<(int OnlyInA, int OnlyInB)> CompareAsync(string repositoryPath, string a, string b, CancellationToken ct = default)
     {
-        var parts = (await ReadAsync(repositoryPath, ["rev-list", "--left-right", "--count", $"{a}...{b}"], ct))
+        var parts = (await ReadAsync(repositoryPath, ["rev-list", "--left-right", "--count", $"{a}...{b}", "--"], ct))
             .Split(['\t', ' '], StringSplitOptions.RemoveEmptyEntries);
         return (int.Parse(parts[0]), int.Parse(parts[1]));
     }
@@ -72,7 +72,10 @@ public sealed partial class GitService
     {
         var r = await RunAsync(repositoryPath, ["merge-tree", "--write-tree", "--name-only", "--no-messages", target, source], null, ct);
         if (r.ExitCode == 0) return [];
-        if (r.ExitCode != 1) throw new GitCommandException($"Impossible de simuler la fusion : {r.StandardError.Trim()}", r);
+        if (r.ExitCode != 1)
+            throw new GitCommandException(r.StandardError.Contains("unrelated histories")
+                ? "Ces deux branches n'ont aucun commit en commun (historiques sans rapport) : GitSpread ne les fusionne pas."
+                : $"Impossible de simuler la fusion : {r.StandardError.Trim()}", r);
         return r.StandardOutput.Split('\n').Skip(1).Select(l => l.Trim()).Where(l => l.Length > 0).Distinct().ToList();
     }
 
@@ -209,7 +212,7 @@ public sealed partial class GitService
         {
             var f = line.TrimEnd('\r').Split('\x1f');
             if (f.Length < 6) continue;
-            DateTimeOffset? date = DateTimeOffset.TryParse(f[5], out var d) ? d : null;
+            DateTimeOffset? date = DateTimeOffset.TryParse(f[5], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
 
             if (f[0].StartsWith("refs/heads/"))
             {

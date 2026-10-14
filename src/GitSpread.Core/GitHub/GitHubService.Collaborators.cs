@@ -34,7 +34,7 @@ public sealed partial class GitHubService
     public async Task<IReadOnlyList<GitHubCollaborator>> ListCollaboratorsAsync(GitHubAccount account, string fullName, CancellationToken ct = default)
     {
         var owner = fullName.Split('/')[0];
-        var json = await gh.RunCheckedAsync(["api", $"repos/{fullName}/collaborators?affiliation=direct&per_page=100"], await EnvironmentForAsync(account, ct), ct);
+        var json = await gh.RunCheckedAsync(["api", $"repos/{RepoPath(fullName)}/collaborators?affiliation=direct&per_page=100"], await EnvironmentForAsync(account, ct), ct);
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.EnumerateArray()
             .Select(e => new GitHubCollaborator(e.GetProperty("login").GetString()!,
@@ -45,7 +45,7 @@ public sealed partial class GitHubService
 
     /// <summary>Invitations envoyées et pas encore acceptées (visible par un administrateur du repo).</summary>
     public async Task<IReadOnlyList<GitHubInvitation>> ListPendingInvitationsAsync(GitHubAccount account, string fullName, CancellationToken ct = default) =>
-        ParseInvitations(await gh.RunCheckedAsync(["api", $"repos/{fullName}/invitations?per_page=100"], await EnvironmentForAsync(account, ct), ct));
+        ParseInvitations(await gh.RunCheckedAsync(["api", $"repos/{RepoPath(fullName)}/invitations?per_page=100"], await EnvironmentForAsync(account, ct), ct));
 
     /// <summary>Invitations reçues par le compte, en attente de réponse.</summary>
     public async Task<IReadOnlyList<GitHubInvitation>> ListReceivedInvitationsAsync(GitHubAccount account, CancellationToken ct = default) =>
@@ -57,7 +57,7 @@ public sealed partial class GitHubService
     /// </summary>
     public async Task<long?> InviteCollaboratorAsync(GitHubAccount owner, string fullName, string login, CancellationToken ct = default)
     {
-        var json = await gh.RunCheckedAsync(["api", "--method", "PUT", $"repos/{fullName}/collaborators/{login}"], await EnvironmentForAsync(owner, ct), ct);
+        var json = await gh.RunCheckedAsync(["api", "--method", "PUT", $"repos/{RepoPath(fullName)}/collaborators/{LoginPath(login)}"], await EnvironmentForAsync(owner, ct), ct);
         if (string.IsNullOrWhiteSpace(json)) return null;
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.TryGetProperty("id", out var id) ? id.GetInt64() : null;
@@ -71,11 +71,11 @@ public sealed partial class GitHubService
 
     /// <summary>Annule une invitation envoyée (token du propriétaire).</summary>
     public async Task CancelInvitationAsync(GitHubAccount owner, string fullName, long invitationId, CancellationToken ct = default) =>
-        await gh.RunCheckedAsync(["api", "--method", "DELETE", $"repos/{fullName}/invitations/{invitationId}"], await EnvironmentForAsync(owner, ct), ct);
+        await gh.RunCheckedAsync(["api", "--method", "DELETE", $"repos/{RepoPath(fullName)}/invitations/{invitationId}"], await EnvironmentForAsync(owner, ct), ct);
 
     /// <summary>Retire un collaborateur. Avec le token du collaborateur lui-même, c'est « quitter le repo ».</summary>
     public async Task RemoveCollaboratorAsync(GitHubAccount account, string fullName, string login, CancellationToken ct = default) =>
-        await gh.RunCheckedAsync(["api", "--method", "DELETE", $"repos/{fullName}/collaborators/{login}"], await EnvironmentForAsync(account, ct), ct);
+        await gh.RunCheckedAsync(["api", "--method", "DELETE", $"repos/{RepoPath(fullName)}/collaborators/{LoginPath(login)}"], await EnvironmentForAsync(account, ct), ct);
 
     /// <summary>
     /// Donne accès au repo à un autre compte. Si ce compte est connecté à GitSpread, l'invitation est acceptée
@@ -121,7 +121,7 @@ public sealed partial class GitHubService
                 Permission = e.TryGetProperty("permissions", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString()! : "write",
                 IsExpired = e.TryGetProperty("expired", out var x) && x.ValueKind == JsonValueKind.True,
                 CreatedAt = e.TryGetProperty("created_at", out var c) && c.ValueKind == JsonValueKind.String
-                    && DateTimeOffset.TryParse(c.GetString(), out var date) ? date : null,
+                    && DateTimeOffset.TryParse(c.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null,
             })
             .ToList();
     }

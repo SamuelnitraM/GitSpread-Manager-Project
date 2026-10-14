@@ -9,12 +9,29 @@ namespace GitSpread.Core.Git;
 /// </summary>
 public static class GitCredentialEnvironment
 {
-    public static IReadOnlyDictionary<string, string> For(string login, string token, string host = "github.com")
+    /// <param name="url">Adresse exacte du dépôt : la vérification du certificat y est aussi imposée. git retient le réglage
+    /// le plus précis ; une config locale visant le chemin du dépôt (http.https://github.com/moi/.sslVerify=false) l'emporterait
+    /// sinon sur le réglage de l'hôte.</param>
+    public static IReadOnlyDictionary<string, string> For(string login, string token, string host = "github.com", string? url = null)
     {
         var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{login}:{token}"));
-        return WithConfig(
+        List<(string, string)> config =
+        [
             ("credential.helper", ""), // vide la liste des helpers (GCM) pour ce seul processus
-            ($"http.https://{host}/.extraHeader", $"Authorization: Basic {basic}")); // limité à cet hôte
+            ($"http.https://{host}/.extraHeader", $"Authorization: Basic {basic}"), // limité à cet hôte
+            // Jamais d'envoi du jeton sans vérification du certificat, même si la config du dépôt la désactive.
+            ("http.sslVerify", "true"),
+            ($"http.https://{host}/.sslVerify", "true"),
+            // Pas de descente dans les sous-modules : leur propre configuration (.git/modules/…) n'est pas contrôlée et
+            // pourrait envoyer le jeton par un proxy. GitSpread ne gère pas les sous-modules.
+            ("submodule.recurse", "false"),
+            ("fetch.recurseSubmodules", "false"),
+            ("push.recurseSubmodules", "no"),
+            // Pas de « http.curloptResolve= » ici : vide, il casse le choix du moteur SSL de git pour Windows (« Unsupported SSL
+            // backend »). Une redirection d'adresse déclarée par le dépôt est refusée avant l'envoi (GitService.NetworkOverrideAsync).
+        ];
+        if (url is not null) config.Add(($"http.{url}.sslVerify", "true")); // ex. https://moi@github.com:443/o/r.git
+        return WithConfig([.. config]);
     }
 
     /// <summary>Environnement non interactif : échec propre plutôt qu'une fenêtre ou un prompt bloquant.</summary>

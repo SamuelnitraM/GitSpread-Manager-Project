@@ -17,7 +17,7 @@ public sealed partial class GitService
     /// <summary>Supprime une branche sur le dépôt distant (GitHub), avec le compte du lien.</summary>
     public Task<GitResult> DeleteRemoteBranchAsync(string repositoryPath, string remote, string branch, IReadOnlyDictionary<string, string> auth,
         CancellationToken ct = default) =>
-        ActAsync(repositoryPath, ["push", remote, "--delete", branch], auth, ct, NetworkTimeout);
+        ActAsync(repositoryPath, ["push", remote, "--delete", $"refs/heads/{branch}"], auth, ct, NetworkTimeout); // nom complet : jamais pris pour une option
 
     /// <summary>
     /// Oublie la copie locale d'une branche distante qui n'existe plus (ex. renommée sur GitHub : juste après, le serveur
@@ -31,12 +31,14 @@ public sealed partial class GitService
     /// <summary>
     /// Commits de <paramref name="reference"/> absents de toutes les références <paramref name="elsewhere"/>
     /// (et, si demandé, de toutes les branches connues sur les dépôts distants) : ceux qu'une suppression ferait perdre.
+    /// Passer des références complètes (refs/heads/x) : un tag ou un dossier du même nom ne fausse pas le compte.
     /// </summary>
     public async Task<int> CountCommitsOnlyInAsync(string repositoryPath, string reference, IEnumerable<string> elsewhere, bool excludeRemotes,
         CancellationToken ct = default)
     {
         List<string> args = ["rev-list", "--count", reference, "--not", .. elsewhere];
         if (excludeRemotes) args.Add("--remotes");
+        args.Add("--");
         return int.TryParse((await ReadAsync(repositoryPath, args, ct)).Trim(), out var n) ? n : 0;
     }
 }

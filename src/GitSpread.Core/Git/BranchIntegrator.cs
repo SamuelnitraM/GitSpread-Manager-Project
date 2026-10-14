@@ -82,6 +82,9 @@ public sealed record IntegrationOptions
     /// <summary>Supprimer la branche source locale une fois intégrée (refusé par git si du travail n'est pas fusionné).</summary>
     public bool DeleteSource { get; init; }
 
+    /// <summary>Lien principal du projet, vers lequel la cible est envoyée (pas toujours « origin »).</summary>
+    public string Remote { get; init; } = "origin";
+
     public string? MergeMessage { get; init; }
 }
 
@@ -167,7 +170,7 @@ public sealed class BranchIntegrator(GitService git)
                 if (a.Kind == IntegrationKind.Merge && a.NeedsCheckout) steps.Add($"git switch {a.CurrentBranch}   (retour sur ta branche)");
                 break;
         }
-        if (o.PushTarget && a.Kind != IntegrationKind.Conflicts) steps.Add($"git push origin {a.Target}");
+        if (o.PushTarget && a.Kind != IntegrationKind.Conflicts) steps.Add($"git push {o.Remote} {a.Target}");
         if (o.DeleteSource && a.Kind != IntegrationKind.Conflicts) steps.Add($"git branch -d {a.Source}");
         if (stash && a.Kind != IntegrationKind.Conflicts) steps.Add("git stash pop   (restauration de tes modifications)");
         return steps;
@@ -197,12 +200,16 @@ public sealed class BranchIntegrator(GitService git)
         {
             if (!o.StashChanges) return Fail(a.Summary);
             progress?.Report("Mise de côté de tes modifications en cours…");
+            var before = (await git.ListStashesAsync(dir, ct)).Count;
             if (!Ok(await git.StashAsync(dir, a.CurrentBranch, ct))) return Fail($"Impossible de mettre tes modifications de côté : {Explain()}");
-            stashed = true;
+            // git répond « rien à mettre de côté » sans erreur (ex. modification dans un sous-module) : on ne restaurera alors
+            // pas une ancienne mise de côté qui n'est pas la nôtre.
+            stashed = (await git.ListStashesAsync(dir, CancellationToken.None)).Count > before;
         }
 
         var message = o.MergeMessage ?? DefaultMessage(a);
         var conflictsLeft = false;
+        var switchBackFailed = "";
         try
         {
             // 2. Rattrapage de la cible sur GitHub
@@ -245,12 +252,18 @@ public sealed class BranchIntegrator(GitService git)
                                 + "Modifie ces fichiers (choisis la version à garder entre les marqueurs <<<<<<< et >>>>>>>), puis « Terminer la fusion », ou « Abandonner la fusion ».",
                                 steps) { ConflictsToResolve = true };
                         }
-                        return Fail($"La fusion a échoué : {Explain()}");
+                        var why = Explain();
+                        // Échec sans fusion en cours (ex. historiques sans rapport) : retour sur la branche de départ,
+                        // pour que tes modifications mises de côté y reviennent.
+                        if (a.NeedsCheckout) Ok(await git.SwitchAsync(dir, a.CurrentBranch, CancellationToken.None));
+                        return Fail($"La fusion a échoué : {why}");
                     }
                     if (a.NeedsCheckout)
                     {
                         progress?.Report($"Retour sur {a.CurrentBranch}…");
-                        Ok(await git.SwitchAsync(dir, a.CurrentBranch, ct));
+                        if (!Ok(await git.SwitchAsync(dir, a.CurrentBranch, ct)))
+                            switchBackFailed = $" Attention : impossible de revenir sur {a.CurrentBranch} ({Explain()}) : tu es sur {a.Target}"
+                                + (stashed ? ", et tes modifications restent mises de côté (« Restaurer les modifications mises de côté » une fois revenu sur " + a.CurrentBranch + ")." : ".");
                     }
                     break;
             }
@@ -259,7 +272,7 @@ public sealed class BranchIntegrator(GitService git)
             if (o.PushTarget && auth is not null)
             {
                 progress?.Report($"Envoi de {a.Target} sur GitHub…");
-                if (!Ok(await git.PushAsync(dir, "origin", a.Target, a.TargetUpstream is null, await auth(), ct)))
+                if (!Ok(await git.PushAsync(dir, o.Remote, a.Target, a.TargetUpstream is null, await auth(), ct)))
                     return Fail($"{a.Target} est à jour sur ton poste, mais l'envoi sur GitHub a échoué : {Explain()}");
             }
             if (o.DeleteSource && a.Source != a.CurrentBranch && a.SourceRef == a.Source)
@@ -268,18 +281,27 @@ public sealed class BranchIntegrator(GitService git)
                 Ok(await git.DeleteBranchAsync(dir, a.Source, ct)); // refus éventuel de git sans gravité : signalé dans le détail
             }
 
-            return new IntegrationResult(true, a.Kind == IntegrationKind.FastForward
+            return new IntegrationResult(true, (a.Kind == IntegrationKind.FastForward
                 ? $"{a.Target} contient maintenant le travail de {a.Source} (avance rapide)."
-                : $"{a.Source} a été fusionnée dans {a.Target}.", steps);
+                : $"{a.Source} a été fusionnée dans {a.Target}.") + switchBackFailed, steps);
         }
         finally
         {
             // Les modifications mises de côté reviennent, sauf pendant une fusion avec conflits (elles attendront).
-            if (stashed && !conflictsLeft && await git.FindStashForBranchAsync(dir, a.CurrentBranch, ct) is { } stash)
+            // Jamais interrompu : les modifications mises de côté doivent revenir même si l'opération a été annulée.
+            // Et seulement sur leur branche d'origine : si le retour sur cette branche a échoué, elles attendent (« Restaurer… »).
+            // Une erreur ici ne remplace jamais le résultat de l'intégration : les modifications restent mises de côté.
+            try
             {
-                progress?.Report("Restauration de tes modifications…");
-                steps.Add(await git.PopStashAsync(dir, stash, ct));
+                if (stashed && !conflictsLeft
+                    && (await git.GetStatusAsync(dir, CancellationToken.None)).Branch == a.CurrentBranch
+                    && await git.FindStashForBranchAsync(dir, a.CurrentBranch, CancellationToken.None) is { } stash)
+                {
+                    progress?.Report("Restauration de tes modifications…");
+                    steps.Add(await git.PopStashAsync(dir, stash, CancellationToken.None));
+                }
             }
+            catch (GitCommandException) { }
         }
     }
 }

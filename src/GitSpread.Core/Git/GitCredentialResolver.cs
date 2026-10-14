@@ -17,6 +17,6 @@ public sealed class GitCredentialResolver(AccountService accounts)
             return GitCredentialEnvironment.NonInteractive();
 
         var token = await accounts.GetTokenAsync(account, cancellationToken);
-        return GitCredentialEnvironment.For(account.Login, token, account.Host);
+        return GitCredentialEnvironment.For(account.Login, token, account.Host, remote.Url);
     }
 }

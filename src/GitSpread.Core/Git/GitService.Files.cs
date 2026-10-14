@@ -41,14 +41,15 @@ public sealed partial class GitService
         var size = long.Parse((await ReadAsync(repositoryPath, ["cat-file", "-s", $"{sha}:{path}"], auth, ct)).Trim());
         if (ImageExtensions.Contains(System.IO.Path.GetExtension(path)) && size <= MaxPreviewBytes * 5)
         {
-            var directory = Directory.CreateDirectory(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "GitSpread", "apercus")).FullName;
+            var directory = Directory.CreateDirectory(PreviewDirectory).FullName;
             var image = System.IO.Path.Combine(directory, $"{Guid.NewGuid():N}{System.IO.Path.GetExtension(path)}");
-            await SaveFileAsync(repositoryPath, sha, path, image, auth, ct);
+            await WriteBlobAsync(repositoryPath, sha, path, image, filters: false, auth, ct);
             return new FileContent(FileContentKind.Image, size, [], ImagePath: image);
         }
         if (size > MaxPreviewBytes) return new FileContent(FileContentKind.TooLarge, size, []);
 
-        var text = await ReadAsync(repositoryPath, ["cat-file", "--filters", $"{sha}:{path}"], auth, ct);
+        // Aperçu : contenu brut, sans les filtres du dépôt (un dépôt reçu d'ailleurs ne lance rien quand on le lit).
+        var text = await ReadAsync(repositoryPath, ["cat-file", "blob", $"{sha}:{path}"], auth, ct);
         if (text.Contains('\0')) return new FileContent(FileContentKind.Binary, size, []);
         var lines = text.Split('\n');
         var count = lines.Length > 0 && lines[^1].Length == 0 ? lines.Length - 1 : lines.Length; // dernier saut de ligne
@@ -57,31 +58,48 @@ public sealed partial class GitService
             lines.Take(Math.Min(count, MaxFileLines)).Select(l => l.TrimEnd('\r')).ToList(), truncated);
     }
 
-    /// <summary>Écrit la version de ce commit d'un fichier à l'emplacement choisi (binaire compris). Le projet n'est pas touché.</summary>
-    public async Task SaveFileAsync(string repositoryPath, string sha, string path, string destination,
-        IReadOnlyDictionary<string, string>? auth = null, CancellationToken ct = default)
+    /// <summary>Dossier temporaire des aperçus d'images (vidé au lancement et à la fermeture de GitSpread).</summary>
+    public static string PreviewDirectory => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "GitSpread", "apercus");
+
+    /// <summary>Supprime les aperçus d'images : ils peuvent venir de repos privés.</summary>
+    public static void PurgePreviews()
     {
-        var result = await runner.RunAsync(new Processes.ProcessRequest(Executable,
-            ["--no-optional-locks", "-c", "core.quotepath=false", "cat-file", "--filters", $"{sha}:{path}"])
+        try { if (Directory.Exists(PreviewDirectory)) Directory.Delete(PreviewDirectory, recursive: true); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { } // un aperçu encore affiché : ce sera pour la prochaine fois
+    }
+
+    /// <summary>Écrit la version de ce commit d'un fichier à l'emplacement choisi (binaire compris), telle qu'elle serait
+    /// sur le disque. Le projet n'est pas touché, et un fichier déjà présent n'est remplacé qu'en cas de succès.</summary>
+    public Task SaveFileAsync(string repositoryPath, string sha, string path, string destination,
+        IReadOnlyDictionary<string, string>? auth = null, CancellationToken ct = default) =>
+        WriteBlobAsync(repositoryPath, sha, path, destination, filters: true, auth, ct);
+
+    private async Task WriteBlobAsync(string repositoryPath, string sha, string path, string destination, bool filters,
+        IReadOnlyDictionary<string, string>? auth, CancellationToken ct)
+    {
+        await EnsureTokenStaysWithGitHubAsync(repositoryPath, auth, ct);
+        var temp = destination + $".{Guid.NewGuid():N}.tmp";
+        try
         {
-            WorkingDirectory = repositoryPath,
-            Environment = auth ?? GitCredentialEnvironment.NonInteractive(),
-            Timeout = NetworkTimeout,
-            StandardOutputPath = destination,
-        }, ct);
-        if (!result.Succeeded)
+            var result = await runner.RunAsync(
+                Request(repositoryPath, filters ? ["cat-file", "--filters", $"{sha}:{path}"] : ["cat-file", "blob", $"{sha}:{path}"], auth, NetworkTimeout)
+                    with { StandardOutputPath = temp }, ct);
+            if (!result.Succeeded)
+                throw new GitCommandException($"Fichier illisible à ce commit : {result.StandardError.Trim().Split('\n')[0]}", result);
+            File.Move(temp, destination, overwrite: true);
+        }
+        finally
         {
-            try { File.Delete(destination); } catch (IOException) { }
-            throw new GitCommandException($"Fichier illisible à ce commit : {result.StandardError.Trim().Split('\n')[0]}", result);
+            try { if (File.Exists(temp)) File.Delete(temp); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
     }
 
     /// <summary>Vrai si ce fichier a des changements pas encore commités (ou n'est pas suivi par git).</summary>
     public async Task<bool> HasUncommittedChangesAsync(string repositoryPath, string path, CancellationToken ct = default) =>
-        (await ReadAsync(repositoryPath, ["status", "--porcelain", "--", path], ct)).Trim().Length > 0;
+        (await ReadAsync(repositoryPath, ["status", "--porcelain", "--", Literal(path)], ct)).Trim().Length > 0;
 
     /// <summary>Remet dans le projet la version de ce commit d'un fichier. Seul le fichier sur le disque change :
     /// la restauration apparaît ensuite comme un changement normal, à commiter.</summary>
     public Task<GitResult> RestoreFileAsync(string repositoryPath, string sha, string path, CancellationToken ct = default) =>
-        ActAsync(repositoryPath, ["restore", $"--source={sha}", "--worktree", "--", path], null, ct);
+        ActAsync(repositoryPath, ["restore", $"--source={sha}", "--worktree", "--", Literal(path)], null, ct);
 }

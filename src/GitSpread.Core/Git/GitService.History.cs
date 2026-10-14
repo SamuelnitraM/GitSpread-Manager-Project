@@ -36,13 +36,17 @@ public sealed partial class GitService
     /// </summary>
     public async Task<IReadOnlyList<HistoryCommit>> ReadHistoryAsync(string repositoryPath, int skip = 0, int count = HistoryPageSize, CancellationToken ct = default)
     {
+        // HEAD seulement s'il désigne un commit (repo vide, ou copie dont la branche par défaut n'existe pas encore).
+        var headExists = (await RunAsync(repositoryPath, ["rev-parse", "-q", "--verify", "HEAD^{commit}"], null, ct)).Succeeded;
         var result = await RunAsync(repositoryPath,
-            ["log", "--branches", "--remotes", "HEAD", "--date-order", $"--skip={skip}", $"--max-count={count}", "--decorate=full",
-             "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1e"], null, ct);
+            // Options d'abord : dans un repo vide, « HEAD » n'est pas une révision et git le prendrait pour un chemin.
+            ["log", "--date-order", $"--skip={skip}", $"--max-count={count}", "--decorate=full",
+             "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1e", "--branches", "--remotes", .. (headExists ? ["HEAD"] : Array.Empty<string>()), "--"],
+            null, ct);
         if (!result.Succeeded)
         {
             if (result.StandardError.Contains("does not have any commits") || result.StandardError.Contains("unknown revision")) return [];
-            throw new GitCommandException($"Historique illisible : {result.StandardError.Trim().Split('\n')[0]}", result);
+            throw new GitCommandException(result.StandardError.Trim().Split('\n')[0], result); // l'appelant précise « Historique illisible »
         }
         return ParseHistory(result.StandardOutput);
     }
@@ -52,7 +56,7 @@ public sealed partial class GitService
             .Select(r => r.Trim('\r', '\n').Split('\x1f'))
             .Where(f => f.Length >= 7 && f[0].Length > 0)
             .Select(f => new HistoryCommit(f[0], f[1].Split(' ', StringSplitOptions.RemoveEmptyEntries), f[2], f[3],
-                DateTimeOffset.TryParse(f[4], out var d) ? d : DateTimeOffset.MinValue, f[5], ParseDecorations(f[6])))
+                DateTimeOffset.TryParse(f[4], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : DateTimeOffset.MinValue, f[5], ParseDecorations(f[6])))
             .ToList();
 
     /// <summary>« HEAD -> refs/heads/main, refs/remotes/origin/main, tag: refs/tags/v1 » → HEAD, main, origin/main, tag v1.</summary>
@@ -83,7 +87,7 @@ public sealed partial class GitService
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => l.TrimEnd('\r').Split('\x1f'))
             .Where(f => f.Length >= 4)
-            .ToDictionary(f => f[0].StartsWith("refs/heads/") ? f[0][11..] : f[0][13..], f => (Sha: f[1], Subject: f[2], Date: DateTimeOffset.TryParse(f[3], out var d) ? d : (DateTimeOffset?)null));
+            .ToDictionary(f => f[0].StartsWith("refs/heads/") ? f[0][11..] : f[0][13..], f => (Sha: f[1], Subject: f[2], Date: DateTimeOffset.TryParse(f[3], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : (DateTimeOffset?)null));
 
         var defaultRef = branches.FirstOrDefault(b => b.Name == defaultBranch)?.Ref;
         var result = new List<BranchOverview>();
@@ -113,8 +117,8 @@ public sealed partial class GitService
             .Split('\x1f');
         var commit = ParseHistory(string.Join('\x1f', head.Take(7)) + "\x1e")[0];
         var files = commit.Parents.Count == 0
-            ? await ReadAsync(repositoryPath, ["diff-tree", "--root", "--no-commit-id", "-r", "-M", "--name-status", "-z", sha], auth, ct)
-            : await ReadAsync(repositoryPath, ["diff", "--name-status", "-M", "-z", commit.Parents[0], sha], auth, ct);
+            ? await ReadAsync(repositoryPath, ["diff-tree", "--no-ext-diff", "--no-textconv", "--root", "--no-commit-id", "-r", "-M", "--name-status", "-z", sha], auth, ct)
+            : await ReadAsync(repositoryPath, ["diff", "--no-ext-diff", "--no-textconv", "--name-status", "-M", "-z", commit.Parents[0], sha], auth, ct);
         // Noms complets pour écarter refs/remotes/origin/HEAD (que git abrège en « origin », qui n'est pas une branche).
         var branches = (await ReadAsync(repositoryPath, ["branch", "--all", "--contains", sha, "--format=%(refname)"], ct))
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -154,8 +158,8 @@ public sealed partial class GitService
     {
         IReadOnlyList<string> paths = file.OldPath is { } old ? [old, file.Path] : [file.Path];
         var output = commit.Parents.Count == 0
-            ? await ReadAsync(repositoryPath, ["diff-tree", "--root", "-p", "-M", "--no-commit-id", commit.Sha, "--", .. paths], auth, ct)
-            : await ReadAsync(repositoryPath, ["diff", "-M", commit.Parents[0], commit.Sha, "--", .. paths], auth, ct);
+            ? await ReadAsync(repositoryPath, ["diff-tree", "--no-ext-diff", "--no-textconv", "--root", "-p", "-M", "--no-commit-id", commit.Sha, "--", .. paths.Select(Literal)], auth, ct)
+            : await ReadAsync(repositoryPath, ["diff", "--no-ext-diff", "--no-textconv", "-M", commit.Parents[0], commit.Sha, "--", .. paths.Select(Literal)], auth, ct);
         return ParseDiff(output);
     }
 

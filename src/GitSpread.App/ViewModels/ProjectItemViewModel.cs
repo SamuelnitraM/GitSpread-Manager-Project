@@ -94,6 +94,9 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     [ObservableProperty] public partial string TrackingLabel { get; set; } = "";
     [ObservableProperty] public partial string StatusLabel { get; set; } = "";
     [ObservableProperty] public partial bool IsClean { get; set; }
+
+    /// <summary>Programmes déclarés par la configuration locale du dépôt (sécurité) : avertissement, ou null.</summary>
+    [ObservableProperty] public partial string? ProgramsWarning { get; set; }
     [ObservableProperty] public partial string LastCommitSubject { get; set; } = "";
     [ObservableProperty] public partial string LastCommitMeta { get; set; } = "";
     [ObservableProperty] public partial string IdentityLabel { get; set; } = "";
@@ -115,9 +118,15 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
         try
         {
             var statusTask = Git.GetStatusAsync(Path);
+            var programsTask = Git.ListRepositoryProgramsAsync(Path);
             var commitTask = Git.GetLastCommitAsync(Path);
             var identityTask = Git.GetIdentityAsync(Path);
             var status = _status = await statusTask;
+            var programs = await programsTask;
+            ProgramsWarning = programs.Count == 0 ? null
+                : "Ce dépôt déclare dans sa configuration locale des programmes que git exécute (" + string.Join(", ", programs) + "). "
+                  + "C'est normal pour certains outils (git-crypt…), mais un dossier .git reçu tel quel (archive, clé USB) peut ainsi lancer "
+                  + "n'importe quoi. Si tu ne sais pas d'où il vient, ne l'utilise pas.";
             var commit = await commitTask;
             var identity = await identityTask;
 
@@ -242,13 +251,13 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
         await dialog.LoadAsync();
         if (!host.Dialogs.ShowCommit(dialog)) return;
 
-        await RunAsync("Commit", async () =>
+        var committed = await RunAsync("Commit", async () =>
         {
             var paths = dialog.AllSelected ? null : dialog.SelectedPathspecs;
             var results = await Git.CommitAsync(Path, dialog.FinalMessage, paths);
             return ActionLog.From("Commit", results, $"Commit « {dialog.Message.Trim().Split('\n')[0]} » créé.");
         });
-        if (dialog.PushAfterCommit && LastAction is { Succeeded: true } && CanSync) await PushAsync();
+        if (dialog.PushAfterCommit && committed is { Succeeded: true } && CanSync) await PushAsync();
     }
 
     [RelayCommand]
@@ -297,28 +306,32 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     [RelayCommand] private void OpenOnGitHub() { if (GitHubWebUrl is { } url) Shell.Open(url); }
     [RelayCommand] private Task Reload() => LoadDetailsAsync();
 
-    private Task RunNetworkAsync(string title, Func<IReadOnlyDictionary<string, string>, Task<ActionLog>> action) =>
+    private Task<ActionLog?> RunNetworkAsync(string title, Func<IReadOnlyDictionary<string, string>, Task<ActionLog>> action) =>
         RunAsync(title, async () =>
             await action(await host.Services.Credentials.EnvironmentForAsync(Placement.NetworkAccount, Remote)));
 
-    private async Task RunAsync(string title, Func<Task<ActionLog>> action)
+    /// <summary>Lance une action et renvoie son compte rendu (null si une autre action était déjà en cours :
+    /// l'appelant ne doit pas confondre avec le compte rendu précédent).</summary>
+    private async Task<ActionLog?> RunAsync(string title, Func<Task<ActionLog>> action)
     {
-        if (IsBusy) return;
+        if (IsBusy) return null;
         IsBusy = true;
         BusyLabel = $"{title} en cours…";
+        ActionLog log;
         try
         {
-            LastAction = await action();
+            LastAction = log = await action();
         }
         catch (Exception e)
         {
-            LastAction = ActionLog.Failure(title, e.Message);
+            LastAction = log = ActionLog.Failure(title, e.Message);
         }
         finally
         {
             IsBusy = false;
             await LoadDetailsAsync();
         }
+        return log;
     }
 
     /// <summary>Nom annoncé par les lecteurs d'écran et l'automatisation de l'interface.</summary>

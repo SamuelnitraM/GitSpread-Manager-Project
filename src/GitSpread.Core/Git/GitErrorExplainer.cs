@@ -43,6 +43,11 @@ public static partial class GitErrorExplainer
             return "L'empreinte du serveur SSH n'est pas encore connue. Connecte-toi une fois avec « ssh -T git@github.com » pour l'accepter.";
         if (Has(output, "Authentication failed") || Has(output, "could not read Username") || Has(output, "terminal prompts disabled"))
             return "Authentification impossible : aucun compte connecté dans GitSpread ne correspond à ce dépôt.";
+        if (Has(output, "SSL certificate problem") || Has(output, "server certificate verification failed")
+            || Has(output, "SEC_E_UNTRUSTED_ROOT") || Has(output, "CERT_E_") || Has(output, "CRYPT_E_") || Has(output, "certificate chain"))
+            return "Le certificat du serveur n'a pas pu être vérifié (réseau d'entreprise, proxy ou antivirus qui intercepte les connexions). "
+                   + "GitSpread n'envoie jamais ton jeton sans cette vérification. Si le certificat de ton réseau est installé dans Windows, "
+                   + "« git config --global http.sslBackend schannel » demande à git d'utiliser les certificats de Windows ; sinon, change de réseau.";
         if (Has(output, "Could not resolve host") || Has(output, "Failed to connect") || Has(output, "unable to access"))
             return "Impossible de joindre le serveur : vérifie ta connexion internet.";
         if (Has(output, "does not have any commits yet") || Has(output, "src refspec") && Has(output, "does not match any"))

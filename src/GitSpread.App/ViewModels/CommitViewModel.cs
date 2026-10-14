@@ -64,7 +64,9 @@ public sealed partial class CommitViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowGitignoreAdvice), nameof(CanAddGitignore), nameof(AddGitignoreLabel))]
     public partial bool HasGitignore { get; set; }
 
-    [ObservableProperty] public partial string? GitignoreResult { get; set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasGitignoreResult))] public partial string? GitignoreResult { get; set; }
+    [ObservableProperty] public partial bool GitignoreFailed { get; set; }
+    public bool HasGitignoreResult => GitignoreResult is not null;
 
     public bool HasGeneratedFolders => Changes.Any(c => c.IsGenerated);
     public bool ShowGitignoreAdvice => !HasGitignore && (HasGeneratedFolders || GitignoreSuggestion is not null);
@@ -81,6 +83,7 @@ public sealed partial class CommitViewModel : ObservableObject
 
     [ObservableProperty] public partial bool PushAfterCommit { get; set; }
     [ObservableProperty] public partial string? IdentityResult { get; set; }
+    [ObservableProperty] public partial bool IdentityFailed { get; set; }
 
     public bool HasChanges => Changes.Count > 0;
     public bool AllSelected => Changes.All(c => c.IsSelected);
@@ -160,19 +163,19 @@ public sealed partial class CommitViewModel : ObservableObject
         if (GitignoreSuggestion is not { } template) return;
         if (account is null)
         {
-            GitignoreResult = "Connecte un compte GitHub pour télécharger le modèle de .gitignore.";
+            (GitignoreResult, GitignoreFailed) = ("Connecte un compte GitHub pour télécharger le modèle de .gitignore.", true);
             return;
         }
         try
         {
             var content = await _host.Services.GitHub.GetGitignoreTemplateAsync(account, template);
             await File.WriteAllTextAsync(Path.Combine(_project.Path, ".gitignore"), content);
-            GitignoreResult = $".gitignore « {template} » ajouté : les fichiers qu'il exclut ne seront plus proposés.";
+            (GitignoreResult, GitignoreFailed) = ($".gitignore « {template} » ajouté : les fichiers qu'il exclut ne seront plus proposés.", false);
             await LoadChangesAsync();
         }
         catch (Exception e)
         {
-            GitignoreResult = $"Impossible d'ajouter le .gitignore : {e.Message}";
+            (GitignoreResult, GitignoreFailed) = ($"Impossible d'ajouter le .gitignore : {e.Message}", true);
         }
     }
 
@@ -187,7 +190,8 @@ public sealed partial class CommitViewModel : ObservableObject
     private async Task UseSuggestedIdentityAsync()
     {
         var results = await Identity.ApplySuggestedAsync();
-        IdentityResult = results.All(r => r.Succeeded)
+        IdentityFailed = !results.All(r => r.Succeeded);
+        IdentityResult = !IdentityFailed
             ? "Identité enregistrée pour ce projet uniquement : " + string.Join("  ·  ", results.Select(r => r.Command))
             : results.First(r => !r.Succeeded).Output;
     }

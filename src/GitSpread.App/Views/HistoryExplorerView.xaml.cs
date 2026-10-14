@@ -8,7 +8,15 @@ namespace GitSpread.App.Views;
 
 public partial class HistoryExplorerView : UserControl
 {
-    public HistoryExplorerView() => InitializeComponent();
+    public HistoryExplorerView()
+    {
+        InitializeComponent();
+        // Les pastilles de couleur des branches prennent la palette du nouveau thème.
+        Loaded += (_, _) => { ThemeManager.Changed -= OnThemeChanged; ThemeManager.Changed += OnThemeChanged; };
+        Unloaded += (_, _) => ThemeManager.Changed -= OnThemeChanged;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e) => BranchList.Items.Refresh();
 
     // Une branche choisie dans l'onglet « Branches » : on montre son dernier commit dans le graphe.
     private void Branch_SelectionChanged(object sender, SelectionChangedEventArgs e)

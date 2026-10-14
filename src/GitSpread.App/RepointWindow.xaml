@@ -108,7 +108,7 @@
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding Visibility}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" FontSize="12" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Visibility, Converter={StaticResource VisibilityLabel}}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" FontSize="12" VerticalAlignment="Center" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>

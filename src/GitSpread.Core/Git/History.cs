@@ -80,7 +80,7 @@ public static class HistoryGraph
         string? defaultBranch, IEnumerable<string>? maintenanceTerms = null)
     {
         var terms = maintenanceTerms?.ToList();
-        var byId = commits.ToDictionary(c => c.Sha);
+        var byId = commits.DistinctBy(c => c.Sha).ToDictionary(c => c.Sha); // un commit en double ne fait jamais planter l'affichage
 
         // 1. Branche de chaque commit : on suit les premiers parents depuis le bout de chaque branche (la principale d'abord).
         var owner = new Dictionary<string, string>();

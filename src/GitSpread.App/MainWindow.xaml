@@ -266,15 +266,15 @@
                 <TabControl.Template>
                     <ControlTemplate TargetType="TabControl">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
-                                <TabPanel IsItemsHost="True" Panel.ZIndex="1" />
+                            <DockPanel DockPanel.Dock="Top" LastChildFill="False">
+                                <TabPanel IsItemsHost="True" Panel.ZIndex="1" DockPanel.Dock="Left" MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=DockPanel}, Converter={StaticResource MinusPlusButton}}" />
                                 <Button Style="{StaticResource GhostButton}" Click="AddAccount_Click" AutomationProperties.Name="Connecter un compte" Margin="6,0,0,4" Padding="8,5" VerticalAlignment="Center"
                                         ToolTip="Connecter un nouveau compte GitHub (gh auth login) · Ctrl+N">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="12" />
                                     </StackPanel>
                                 </Button>
-                            </StackPanel>
+                            </DockPanel>
                             <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="0,8,8,8">
                                 <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" />
                             </Border>

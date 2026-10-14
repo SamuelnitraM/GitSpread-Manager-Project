@@ -15,6 +15,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
 {
     private GitHubService GitHub => host.Services.GitHub;
     private GitHubAccount Account => tab.Account;
+    internal AccountTabViewModel Tab => tab;
 
     public string FullName => repository.FullName;
     public string Name => repository.Name;
@@ -138,15 +139,16 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             Name, n => RepositoryName.Validate(n) ?? (n == Name ? "C'est le nom actuel." : null), spacesToDash: true);
         if (newName is null) return;
 
-        await RunAsync("Renommer le repo", async () =>
+        var owner = OwnerLogin; // le propriétaire (compte ou organisation), pas forcément le compte de l'onglet
+        var log = await RunAsync("Renommer le repo", async () =>
         {
             await GitHub.RenameRepositoryAsync(Account, FullName, newName);
-            var results = await FollowLinkedAsync(Account.Login, newName);
+            var results = await FollowLinkedAsync(owner, newName);
             return Log("Renommer le repo", $"gh repo rename {newName} --repo {FullName}", results,
-                $"Le repo s'appelle maintenant {Account.Login}/{newName}." + LinkedSummary(results));
+                $"Le repo s'appelle maintenant {owner}/{newName}." + LinkedSummary(results));
         });
         await host.ReloadRepositoriesAsync(Account);
-        if (LastAction is { Succeeded: true }) tab.Reselect($"{Account.Login}/{newName}", LastAction);
+        if (log is { Succeeded: true }) tab.Reselect($"{owner}/{newName}", log);
         await host.RescanAsync();
     }
 
@@ -179,7 +181,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
                 $"Archiver {FullName} ?\n\nLe repo passe en lecture seule : plus aucun envoi, issue ou pull request possible. Tu pourras le désarchiver à tout moment.",
                 "Archiver"))
             return;
-        await RunAsync(archive ? "Archiver" : "Désarchiver", async () =>
+        var archived = await RunAsync(archive ? "Archiver" : "Désarchiver", async () =>
         {
             await GitHub.SetArchivedAsync(Account, FullName, archive);
             return new ActionLog(archive ? "Archiver" : "Désarchiver", true,
@@ -187,7 +189,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
                 $"gh repo {(archive ? "archive" : "unarchive")} {FullName} --yes", "");
         });
         // Le repo qu'on vient d'archiver doit rester visible dans la liste.
-        if (archive && LastAction is { Succeeded: true }) tab.ShowArchived = true;
+        if (archive && archived is { Succeeded: true }) tab.ShowArchived = true;
         await LoadAsync();
         await host.ReloadRepositoriesAsync(Account);
     }
@@ -246,10 +248,24 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
     [RelayCommand]
     private async Task DeleteAsync()
     {
+        if (!host.Accounts.Any(a => a.Is(Account)))
+        {
+            LastAction = ActionLog.Failure("Supprimer le repo", $"Le compte {Account.Login} n'est plus connecté : rien n'a été supprimé.");
+            return;
+        }
         if (!await host.EnsureScopeAsync(Account, ScopeCatalog.DeleteRepo,
                 $"Pour supprimer {FullName}, GitSpread a besoin de l'autorisation « Suppression de repos » sur {Account.Login}."))
+        {
+            LastAction = ActionLog.Failure("Supprimer le repo",
+                $"Rien n'a été supprimé : {Account.Login} n'a pas l'autorisation « Suppression de repos ». Elle s'accorde dans la fenêtre "
+                + "qui vient de s'ouvrir (validation dans le navigateur, avec le compte " + Account.Login + ").");
             return;
-        var account = host.Accounts.First(a => a.Login == Account.Login && a.Host == Account.Host); // autorisations à jour
+        }
+        if (host.Accounts.FirstOrDefault(a => a.Is(Account)) is not { } account) // autorisations à jour
+        {
+            LastAction = ActionLog.Failure("Supprimer le repo", $"Le compte {Account.Login} n'est plus connecté : rien n'a été supprimé.");
+            return;
+        }
 
         var typed = host.Dialogs.Prompt("Supprimer définitivement",
             $"Cette action est IRRÉVERSIBLE : le repo, ses issues, ses pull requests, ses étoiles et son wiki seront supprimés de GitHub.\n"
@@ -258,17 +274,21 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             "", t => t == FullName ? null : $"Tape exactement {FullName}.");
         if (typed is null) return;
 
-        await RunAsync("Supprimer le repo", async () =>
+        var deleted = await RunAsync("Supprimer le repo", async () =>
         {
             await GitHub.DeleteRepositoryAsync(account, FullName);
             var results = new List<GitResult>();
             if (LinkedProjects.Count > 0 && host.Dialogs.Confirm(
                     $"{FullName} est supprimé.\n\nRetirer aussi le lien vers ce repo des {LinkedProjects.Count} projet(s) local(aux) ? Leurs fichiers et leur historique ne changent pas.",
                     "Liens locaux"))
-                foreach (var p in LinkedProjects) results.Add(await host.Services.Linked.UnlinkAsync(p, FullName));
+                foreach (var p in LinkedProjects) results.Add(await host.Services.Linked.UnlinkAsync(p, FullName, host: Account.Host));
             return Log("Supprimer le repo", $"gh repo delete {FullName} --yes", results, $"{FullName} a été supprimé de GitHub." + LinkedSummary(results));
         });
-        if (LastAction is { Succeeded: true }) tab.CloseRepositoryPanel();
+        if (deleted is { Succeeded: true })
+        {
+            tab.CloseRepositoryPanel();
+            tab.Notice = deleted.Message; // le panneau se ferme : le résultat reste affiché en haut de la liste
+        }
         await host.ReloadRepositoriesAsync(account);
         await host.RescanAsync();
     }
@@ -278,7 +298,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
     private async Task<List<GitResult>> FollowLinkedAsync(string newOwner, string newName)
     {
         var results = new List<GitResult>();
-        foreach (var project in LinkedProjects) results.Add(await host.Services.Linked.FollowAsync(project, newOwner, newName, FullName));
+        foreach (var project in LinkedProjects) results.Add(await host.Services.Linked.FollowAsync(project, newOwner, newName, FullName, host: Account.Host));
         return results;
     }
 
@@ -291,9 +311,11 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             string.Join("\n", localSteps.Select(r => r.Command).Prepend(githubCommand)),
             string.Join("\n", localSteps.Select(r => r.Output).Where(o => o.Length > 0)));
 
-    private async Task RunAsync(string title, Func<Task<ActionLog>> action)
+    /// <summary>Lance une action et renvoie son compte rendu (null si une autre action était déjà en cours :
+    /// l'appelant ne doit pas confondre avec le compte rendu précédent).</summary>
+    private async Task<ActionLog?> RunAsync(string title, Func<Task<ActionLog>> action)
     {
-        if (IsBusy) return;
+        if (IsBusy) return null;
         IsBusy = true;
         BusyLabel = $"{title} en cours…";
         try { LastAction = await action(); }
@@ -303,6 +325,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
             LastAction = ActionLog.Failure(title, e.Message);
         }
         finally { IsBusy = false; }
+        return LastAction;
     }
 
     private void RaiseAll()

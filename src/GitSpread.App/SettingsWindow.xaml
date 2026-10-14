@@ -78,7 +78,7 @@
     <DockPanel>
         <Border DockPanel.Dock="Bottom" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,12">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Fermer" IsDefault="True" IsCancel="True" Click="Close_Click" />
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Fermer" IsCancel="True" Click="Close_Click" />
                 <TextBlock Text="Chaque réglage s'applique tout de suite. Si les dossiers ont changé, GitSpread analyse de nouveau tes projets à la fermeture."
                            Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,16,0" />
             </DockPanel>
@@ -178,7 +178,9 @@
                         <StackPanel>
                             <TextBlock Text="Nouveaux repos" Style="{StaticResource GroupTitle}" />
                             <TextBlock Style="{StaticResource Hint}" Text="Visibilité cochée par défaut quand tu publies un projet ou crées un repo." />
-                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding NewRepositoriesPrivate}" GroupName="Visibility" Content="Privé : visible seulement par toi et tes collaborateurs (recommandé)" />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding NewRepositoriesPrivate}" GroupName="Visibility">
+                                <TextBlock Text="Privé : visible seulement par toi et tes collaborateurs (recommandé)" TextWrapping="Wrap" />
+                            </RadioButton>
                             <RadioButton Style="{StaticResource Option}" IsChecked="{Binding NewRepositoriesPublic}" GroupName="Visibility" Content="Public : visible par tout le monde" />
                         </StackPanel>
                     </Border>
@@ -388,7 +390,9 @@
                                 <TextBlock Text="Nom" VerticalAlignment="Center" Margin="0,0,12,0" />
                                 <TextBox Grid.Column="1" Text="{Binding GlobalName, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" AutomationProperties.Name="Nom global" />
                                 <TextBlock Grid.Row="1" Text="E-mail" VerticalAlignment="Center" Margin="0,8,12,0" />
-                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GlobalEmail, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,8,0,0" AutomationProperties.Name="E-mail global" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GlobalEmail, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,8,0,0" AutomationProperties.Name="E-mail global">
+                                    <TextBox.InputBindings><KeyBinding Key="Enter" Command="{Binding SaveGlobalIdentityCommand}" /></TextBox.InputBindings>
+                                </TextBox>
                             </Grid>
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                 <Button Style="{StaticResource SecondaryButton}" Content="Enregistrer l'identité du poste" Command="{Binding SaveGlobalIdentityCommand}" />

@@ -44,9 +44,9 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
         ? "1 invitation à collaborer reçue"
         : $"{ReceivedInvitations.Count} invitations à collaborer reçues";
 
-    [ObservableProperty] public partial string? InvitationMessage { get; set; }
-    public bool HasInvitationMessage => InvitationMessage is not null;
-    partial void OnInvitationMessageChanged(string? value) => OnPropertyChanged(nameof(HasInvitationMessage));
+    [ObservableProperty] public partial string? Notice { get; set; }
+    public bool HasNotice => Notice is not null;
+    partial void OnNoticeChanged(string? value) => OnPropertyChanged(nameof(HasNotice));
 
     [RelayCommand]
     private async Task AcceptInvitationAsync(GitHubInvitation invitation)
@@ -54,9 +54,9 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
         try
         {
             await gitHub.AcceptInvitationAsync(Account, invitation.Id);
-            InvitationMessage = $"Tu es maintenant collaborateur de {invitation.FullName} avec {Login}.";
+            Notice = $"Tu es maintenant collaborateur de {invitation.FullName} avec {Login}.";
         }
-        catch (Exception e) { InvitationMessage = $"Impossible d'accepter l'invitation à {invitation.FullName} : {e.Message}"; }
+        catch (Exception e) { Notice = $"Impossible d'accepter l'invitation à {invitation.FullName} : {e.Message}"; }
         await host.ReloadCollaborationsAsync();
     }
 
@@ -69,9 +69,9 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
         try
         {
             await gitHub.DeclineInvitationAsync(Account, invitation.Id);
-            InvitationMessage = $"Invitation à {invitation.FullName} refusée.";
+            Notice = $"Invitation à {invitation.FullName} refusée.";
         }
-        catch (Exception e) { InvitationMessage = $"Impossible de refuser l'invitation à {invitation.FullName} : {e.Message}"; }
+        catch (Exception e) { Notice = $"Impossible de refuser l'invitation à {invitation.FullName} : {e.Message}"; }
         await LoadRepositoriesAsync();
     }
 
@@ -98,7 +98,8 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
     partial void OnSelectedRepositoryChanged(RepositoryItemViewModel? value)
     {
         if (value is null) return; // la liste se vide le temps d'un filtrage : le panneau reste affiché
-        if (RepositoryPanel?.FullName == value.Repository.FullName) return;
+        if (RepositoryPanel?.FullName == value.Repository.FullName) return; // même repo, liste rechargée
+        Notice = null; // le message concernait l'action précédente
         RepositoryPanel = new GitHubRepositoryViewModel(this, value.Repository, host, logger);
         _ = LoadPanelAsync(RepositoryPanel);
     }
@@ -112,6 +113,8 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
     partial void OnShowRepositoriesChanged(bool value) => UpdateHistory();
 
     /// <summary>Dans « Repos sur GitHub », l'aperçu montre l'historique du projet local lié au repo choisi, ou propose de le cloner.</summary>
+    protected override bool ShowsProjectHistory => !ShowRepositories;
+
     protected override void UpdateHistory()
     {
         if (!ShowRepositories) { base.UpdateHistory(); return; }
@@ -135,10 +138,11 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
     protected override string? ExplorerKey() =>
         ShowRepositories ? RepositoryPanel?.LinkedProjects.FirstOrDefault()?.Path ?? RepositoryPanel?.FullName : base.ExplorerKey();
     public bool HasNoRepositories => !IsLoadingRepositories && Error is null && Repositories.Count == 0;
+    public bool ShowLoadingRepositories => IsLoadingRepositories && Repositories.Count == 0;
 
     partial void OnShowArchivedChanged(bool value) => ApplyFilter();
     partial void OnErrorChanged(string? value) { OnPropertyChanged(nameof(HasError)); OnPropertyChanged(nameof(HasNoRepositories)); }
-    partial void OnIsLoadingRepositoriesChanged(bool value) => OnPropertyChanged(nameof(HasNoRepositories));
+    partial void OnIsLoadingRepositoriesChanged(bool value) { OnPropertyChanged(nameof(HasNoRepositories)); OnPropertyChanged(nameof(ShowLoadingRepositories)); }
 
     public async Task LoadRepositoriesAsync()
     {
@@ -200,6 +204,7 @@ public sealed partial class AccountTabViewModel(GitHubAccount account, IProjectH
             Repositories.Add(repo);
         SelectedRepository = Repositories.FirstOrDefault(r => r.Repository.FullName.Equals(selected, StringComparison.OrdinalIgnoreCase));
         OnPropertyChanged(nameof(HasNoRepositories));
+        OnPropertyChanged(nameof(ShowLoadingRepositories));
     }
 
     /// <summary>Rouvre le panneau sur un repo (ex. après un renommage), en gardant le compte rendu de l'action.</summary>

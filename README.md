@@ -396,6 +396,12 @@ Leur état est mémorisé et vaut pour tous les projets et tous les repos. La m�
 - **Ta configuration git globale n'est pas modifiée** par les opérations réseau. Seule la page « Identité globale du poste » la change, et seulement si tu enregistres.
 - **Aucun secret dans les fichiers de GitSpread** : les tokens restent dans le trousseau Windows géré par `gh`, et ils sont masqués dans les journaux.
 - **Échecs propres** : git ne peut jamais ouvrir de fenêtre de mot de passe qui bloquerait l'application. Si un repointage échoue, l'ancien lien est rétabli.
+- **Un dépôt reçu d'ailleurs ne lance rien quand GitSpread le lit** : `core.fsmonitor` est désactivé, les modifications sont affichées sans outil de diff ni conversion définis par le dépôt, et l'aperçu d'un fichier montre son contenu brut.
+- **Le token n'est jamais envoyé sans vérification du certificat HTTPS**, même si la configuration du dépôt la désactive.
+- **Les noms de fichiers sont pris tels quels**, jamais comme des motifs : `[id].tsx` ne désigne pas aussi `i.tsx`.
+- **Les noms de branches et de repos sont vérifiés et encodés** avant chaque appel à l'API GitHub. Supprimer `fix#12` ne peut pas supprimer `fix`.
+- **Les secrets restent hors des journaux** : tokens et phrase secrète d'une clé SSH sont masqués. Les aperçus d'images, qui peuvent venir de repos privés, sont effacés au lancement et à la fermeture.
+- **À savoir sur les hooks git** : comme avec git en ligne de commande, les hooks du projet (`pre-push`, `post-merge`…) s'exécutent pendant Pousser ou Tirer. Ils peuvent lire l'environnement de git, qui contient alors le token du compte. N'utilise donc que des hooks de confiance.
 
 ## Où sont stockées les données
 

@@ -229,9 +229,10 @@ public sealed partial class ProjectItemViewModel
         if (!host.Dialogs.ShowIntegration(dialog) || dialog.Analysis is not { } analysis) return;
 
         var options = dialog.BuildOptions();
-        await RunAsync(dialog.Title, async () =>
+        Core.Git.IntegrationResult? integration = null;
+        var integrated = await RunAsync(dialog.Title, async () =>
         {
-            var result = await host.Services.Integrator.IntegrateAsync(Path, analysis, options,
+            var result = integration = await host.Services.Integrator.IntegrateAsync(Path, analysis, options,
                 () => host.Services.Credentials.EnvironmentForAsync(Placement.NetworkAccount, Remote));
             return new ActionLog(dialog.Title, result.Succeeded || result.ConflictsToResolve, result.Message,
                 string.Join("\n", result.Steps.Select(s => s.Command)),
@@ -240,7 +241,8 @@ public sealed partial class ProjectItemViewModel
 
         // F3B : la branche intégrée part aussi vers les autres liens cochés, après confirmation.
         var others = SelectedLinks.Where(l => l.IsSecondary).ToList();
-        if (options.PushTarget && others.Count > 0 && LastAction is { Succeeded: true } integrated)
+        // Seulement si l'intégration est vraiment terminée : avec des conflits en cours, la cible n'est pas encore fusionnée.
+        if (options.PushTarget && others.Count > 0 && integration is { Succeeded: true } && integrated is not null)
             await RunAsync(dialog.Title, async () =>
             {
                 var pushed = await PushToLinksAsync(analysis.Target, others, setPrimaryUpstream: false, alwaysConfirm: true);
@@ -303,6 +305,7 @@ public sealed partial class ProjectItemViewModel
 
     private async Task RepointAsync(GitHubAccount? targetAccount)
     {
+        await EnsureDetailsAsync(); // l'assistant prévient s'il y a des modifications non commitées : l'état doit être lu
         var dialog = new RepointViewModel(this, host, targetAccount);
         host.Dialogs.ShowRepoint(dialog);
         if (!dialog.Done) return;

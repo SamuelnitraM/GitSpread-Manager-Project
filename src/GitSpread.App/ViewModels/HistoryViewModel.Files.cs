@@ -105,7 +105,22 @@ public sealed partial class HistoryViewModel
     private IReadOnlyList<TreeEntry> _allFiles = [];
     private Dictionary<string, CommitFile> _changes = [];
     private PanelSections? _sections;
-    private PanelSections Sections => _sections ??= new PanelSections(host);
+    private PanelSections Sections
+    {
+        get
+        {
+            if (_sections is not null) return _sections;
+            _sections = new PanelSections(host);
+            // Paramètres › « Tout remettre dans l'état par défaut » : la bascule suit.
+            _sections.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is "" or null or nameof(PanelSections.HistoryAllFiles))
+                    foreach (var p in new[] { nameof(ShowAllFiles), nameof(ShowChangedFiles), nameof(FilesHeader), nameof(NoChangedFilesShown) })
+                        OnPropertyChanged(p);
+            };
+            return _sections;
+        }
+    }
 
     public ObservableCollection<FileTreeNode> Tree { get; } = [];
     public ObservableCollection<FileLine> ContentLines { get; } = [];
@@ -149,6 +164,9 @@ public sealed partial class HistoryViewModel
     [ObservableProperty] public partial string? ContentNote { get; set; }
     [ObservableProperty] public partial string? ImagePath { get; set; }
     [ObservableProperty] public partial string? FileStatus { get; set; }
+
+    /// <summary>Le dernier message sur le fichier est un échec (affiché en orange, pas en vert).</summary>
+    [ObservableProperty] public partial bool FileStatusFailed { get; set; }
 
     public bool IsShowingChanges => ViewMode == FileViewMode.Changes;
     public bool ContentNoteShown => HasContentNote && IsShowingContent;
@@ -205,7 +223,8 @@ public sealed partial class HistoryViewModel
     private async Task ShowContentAsync(string path)
     {
         var version = ++_contentVersion;
-        _diffVersion++; // une lecture de modifications en cours ne doit plus rien afficher
+        _diffVersion++; // une lecture de modifications en cours ne doit plus rien afficher…
+        IsLoadingDiff = false; // …ni laisser tourner son indicateur
         ViewedPath = path;
         ViewMode = FileViewMode.Content;
         ContentLines.Clear();
@@ -314,8 +333,8 @@ public sealed partial class HistoryViewModel
         try
         {
             await Git.SaveFileAsync(project.Path, details.Commit.Sha, path, destination, _remote?.Auth);
-            FileStatus = $"Version du commit {details.Commit.ShortSha} enregistrée : {destination}";
+            (FileStatus, FileStatusFailed) = ($"Version du commit {details.Commit.ShortSha} enregistrée : {destination}", false);
         }
-        catch (Exception e) { FileStatus = $"Enregistrement impossible : {e.Message}"; }
+        catch (Exception e) { (FileStatus, FileStatusFailed) = ($"Enregistrement impossible : {e.Message}", true); }
     }
 }

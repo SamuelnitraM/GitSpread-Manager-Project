@@ -86,6 +86,9 @@ public sealed class RepositoryPanelTests : IDisposable
         await panel.DeleteCommand.ExecuteAsync(null); // EnsureScopeAsync : refus (pas de delete_repo)
 
         Assert.DoesNotContain(host.Runner.Requests, r => r.Arguments.Take(2).SequenceEqual(["repo", "delete"]));
+        // Jamais d'arrêt silencieux : le compte rendu dit pourquoi rien n'a été supprimé.
+        Assert.False(panel.LastAction!.Succeeded);
+        Assert.Contains("Rien n'a été supprimé", panel.LastAction.Message);
     }
 
     [Fact]
@@ -104,6 +107,7 @@ public sealed class RepositoryPanelTests : IDisposable
 
         Assert.Equal(["repo", "delete", "SmartDev-Web/stock", "--yes"], host.Runner.Single("repo", "delete").Arguments);
         Assert.True(panel.LastAction!.Succeeded, panel.LastAction.Message);
+        Assert.StartsWith("SmartDev-Web/stock a été supprimé de GitHub.", panel.Tab.Notice); // reste affiché une fois le panneau fermé
         Assert.Equal("", await _local.Git("remote")); // lien mort retiré…
         Assert.True(File.Exists(Path.Combine(_local.Path, "README.md"))); // …fichiers intacts
     }

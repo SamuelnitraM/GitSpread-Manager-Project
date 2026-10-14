@@ -14,6 +14,7 @@ public sealed partial class IdentityViewModel(string path, IProjectHost host) : 
 {
     private AppServices Services => host.Services;
     private (GitHubAccount Account, string Email)? _unrecognised;
+    private int _version;
 
     /// <summary>L'utilisateur peut confirmer qu'une adresse non publique appartient bien au compte.</summary>
     public bool CanConfirmEmail => _unrecognised is not null;
@@ -32,7 +33,11 @@ public sealed partial class IdentityViewModel(string path, IProjectHost host) : 
     /// <param name="isRepository">Faux : le dossier n'a pas encore de .git, seule la config globale compte.</param>
     public async Task LoadAsync(GitHubAccount? account, bool isRepository = true)
     {
+        // Changer vite de compte lance plusieurs lectures : seule la dernière compte (sinon on proposerait de signer
+        // avec le compte précédent, exactement l'erreur que GitSpread doit éviter).
+        var version = ++_version;
         var identity = await Services.Git.GetIdentityAsync(isRepository ? path : Environment.CurrentDirectory);
+        if (version != _version) return;
         Label = identity is { Name: null, Email: null }
             ? "Aucune identité configurée"
             : $"{identity.Name ?? "(sans nom)"} <{identity.Email ?? "sans e-mail"}>";
@@ -41,6 +46,7 @@ public sealed partial class IdentityViewModel(string path, IProjectHost host) : 
         if (account is { IsAuthenticated: true })
         {
             user = await host.GetAccountUserAsync(account); // null hors ligne : avertissement générique
+            if (version != _version) return;
         }
         Suggested = user is null || account is null ? null : host.IdentityFor(account, user);
 

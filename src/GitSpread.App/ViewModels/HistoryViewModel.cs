@@ -134,6 +134,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     private Task ShowMessage(string message, bool keepClone = false)
     {
         _version++;
+        IsLoading = false; // une lecture en cours (ex. « Afficher plus ») ne laisse pas son indicateur affiché
         if (!keepClone) CloneCommand = null;
         _remote = null;
         Project = null;
@@ -215,13 +216,15 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
             var path = project.Path;
             var remotesTask = Git.GetRemotesAsync(path);
             // Copie légère : sa branche par défaut est celle de GitHub (HEAD du dépôt nu).
-            _defaultBranch = _remote is { } remote
+            var defaultBranch = _remote is { } remote
                 ? remote.DefaultBranch ?? await Git.GetHeadBranchAsync(path)
                 : await Git.GetDefaultBranchAsync(path, project.RemoteName ?? "origin");
-            var branches = await Git.GetBranchOverviewAsync(path, _defaultBranch);
+            var branches = await Git.GetBranchOverviewAsync(path, defaultBranch);
             var commits = await Git.ReadHistoryAsync(path, 0, PageSize);
             var remotes = (await remotesTask).Select(r => r.Name).ToList();
             if (version != _version) return; // un autre projet a été choisi entre-temps
+
+            _defaultBranch = defaultBranch; // seulement maintenant : une lecture dépassée ne change pas la branche principale affichée
 
             _remotes = remotes;
             _branches = branches;
@@ -254,12 +257,20 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         {
             var more = await Git.ReadHistoryAsync(project.Path, _commits.Count, PageSize);
             if (version != _version) return;
-            _commits.AddRange(_remote is null ? more : more.Select(WithoutHead));
+            // Une branche a pu bouger entre deux pages (récupération, commit dans un terminal) : pas de commit en double.
+            var known = _commits.Select(c => c.Sha).ToHashSet();
+            _commits.AddRange((_remote is null ? more : more.Select(WithoutHead)).Where(c => known.Add(c.Sha)));
             HasMore = more.Count == PageSize;
             Render(SelectedRow?.Commit.Sha);
         }
-        catch (Exception e) { Message = $"Suite de l'historique illisible : {e.Message}"; }
-        finally { IsLoading = false; }
+        catch (Exception e)
+        {
+            if (version != _version) return;
+            // Dans l'historique en grand, sous le commit choisi ; dans l'aperçu (sans colonne de détail), à la place du graphe.
+            if (WithDetails) DetailsError = $"Suite de l'historique illisible : {e.Message}";
+            else Message = $"Suite de l'historique illisible : {e.Message}";
+        }
+        finally { if (version == _version) IsLoading = false; }
     }
 
     [RelayCommand]
@@ -358,6 +369,9 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     // ------------------------------------------------------------ détail du commit choisi (grande fenêtre)
 
     [ObservableProperty] public partial CommitDetails? Details { get; set; }
+
+    /// <summary>Erreur de lecture du commit choisi (ou de la suite de l'historique) : affichée sans masquer le graphe.</summary>
+    [ObservableProperty] public partial string? DetailsError { get; set; }
     [ObservableProperty] public partial CommitFile? SelectedFile { get; set; }
     [ObservableProperty] public partial bool IsLoadingDiff { get; set; }
     public ObservableCollection<CommitFile> Files { get; } = [];
@@ -414,13 +428,10 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     private async Task LoadDetailsAsync(HistoryRowViewModel? row)
     {
         var version = ++_detailsVersion;
+        DetailsError = null;
         if (row is null || Project is not { } project)
         {
-            Details = null;
-            Files.Clear();
-            SelectedFile = null;
-            Diff.Clear();
-            ResetFiles(null, version);
+            ClearDetails(version);
             return;
         }
         try
@@ -440,9 +451,19 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
         {
             if (version != _detailsVersion) return;
             Logger.LogWarning(e, "Détail du commit {Sha} illisible", row.Commit.Sha);
-            Details = null;
-            Message = $"Détail du commit illisible : {e.Message}";
+            ClearDetails(version); // rien du commit précédent ne reste affiché
+            DetailsError = $"Détail du commit illisible : {e.Message}";
         }
+    }
+
+    private void ClearDetails(int version)
+    {
+        Details = null;
+        Files.Clear();
+        SelectedFile = null;
+        Diff.Clear();
+        IsLoadingDiff = false;
+        ResetFiles(null, version);
     }
 
     private int _diffVersion;
@@ -451,6 +472,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
     {
         var version = ++_diffVersion;
         Diff.Clear();
+        IsLoadingDiff = false; // une lecture précédente ne laisse jamais son indicateur affiché
         if (file is null || Details is not { } details || Project is not { } project) return;
         IsLoadingDiff = true;
         try

@@ -10,7 +10,7 @@ namespace GitSpread.Tests.Settings;
 /// <summary>F6d : préférences de la fenêtre des paramètres.</summary>
 public class PreferencesTests
 {
-    private static readonly string[] Git = ["--no-optional-locks", "-c", "core.quotepath=false"];
+    private static readonly string[] Git = ["--no-optional-locks", "-c", "core.quotepath=false", "-c", "core.fsmonitor=false"];
 
     [Fact]
     public void Preferences_have_beginner_friendly_defaults_and_survive_a_round_trip()

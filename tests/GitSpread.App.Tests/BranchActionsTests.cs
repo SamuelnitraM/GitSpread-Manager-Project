@@ -89,6 +89,22 @@ public sealed class BranchActionsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_branch_only_on_a_secondary_link_is_not_reported_as_deleted()
+    {
+        var (host, project) = await ProjectAsync();
+        var autre = await _repo.BareAsync("autre.git");
+        await _repo.Git("push", "-q", autre, "main:seulement-ailleurs");
+        await _repo.Git("remote", "add", "perso", autre);
+        await _repo.Git("fetch", "-q", "perso");
+
+        await project.DeleteBranchAsync(new BranchInfo("seulement-ailleurs") { RemoteRef = "perso/seulement-ailleurs" }, "main");
+
+        Assert.False(project.LastAction!.Succeeded); // avant : « supprimée » alors que rien n'était fait
+        Assert.Contains("n'existe que sur le lien « perso »", project.LastAction.Message);
+        Assert.Empty(host.Confirms);
+    }
+
+    [Fact]
     public async Task Deleting_warns_about_work_that_would_be_lost()
     {
         var (host, project) = await ProjectAsync();

@@ -79,7 +79,7 @@ public sealed partial class GitHubService
 
     /// <summary>Renomme une branche sur GitHub (ex. master → main) : la branche par défaut et les pull requests suivent.</summary>
     public async Task RenameBranchAsync(GitHubAccount account, string fullName, string from, string to, CancellationToken ct = default) =>
-        await gh.RunCheckedAsync(["api", "--method", "POST", $"repos/{fullName}/branches/{from}/rename", "-f", $"new_name={to}"],
+        await gh.RunCheckedAsync(["api", "--method", "POST", $"repos/{RepoPath(fullName)}/branches/{BranchPath(from)}/rename", "-f", $"new_name={to}"],
             await EnvironmentForAsync(account, ct), ct);
 
     internal static GitHubRepositoryDetails ParseDetails(string json)
@@ -87,7 +87,7 @@ public sealed partial class GitHubService
         using var doc = JsonDocument.Parse(json);
         var e = doc.RootElement;
         string? Str(string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && v.GetString() is { Length: > 0 } s ? s : null;
-        DateTimeOffset? Date(string name) => Str(name) is { } s && DateTimeOffset.TryParse(s, out var d) ? d : null;
+        DateTimeOffset? Date(string name) => Str(name) is { } s && DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
         int Int(string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 0;
 
         var topics = e.TryGetProperty("repositoryTopics", out var t) && t.ValueKind == JsonValueKind.Array
