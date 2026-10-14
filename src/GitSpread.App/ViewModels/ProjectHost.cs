@@ -38,6 +38,9 @@ public interface IProjectHost
 
     Task RemoveExtraProjectAsync(string path);
 
+    /// <summary>Cache un projet de la liste sans toucher au dossier (F6d).</summary>
+    Task HideProjectAsync(string path);
+
     /// <summary>Range un projet sans remote dans les projets locaux d'un compte, ou le remet dans « Non liés » (null).
     /// Rien n'est créé sur GitHub.</summary>
     Task AssignProjectAsync(string path, GitHubAccount? account);

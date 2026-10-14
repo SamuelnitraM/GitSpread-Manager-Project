@@ -44,7 +44,8 @@
                 <CheckBox IsChecked="{Binding SignWithAccount}" Margin="0,14,0,0">
                     <TextBlock Text="{Binding SignLabel}" TextWrapping="Wrap" />
                 </CheckBox>
-                <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8" Margin="0,14,0,0">
+                <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8" Margin="0,14,0,0"
+                        Visibility="{Binding ShowCommands, Source={x:Static vm:DisplayPreferences.Current}, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Text="{Binding CommandPreview, StringFormat='&gt; {0}'}" Foreground="{DynamicResource CodeText}" FontFamily="Consolas" TextWrapping="Wrap" />
                 </Border>
             </StackPanel>

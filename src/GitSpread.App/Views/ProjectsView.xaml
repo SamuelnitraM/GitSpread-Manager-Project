@@ -51,7 +51,9 @@
                                         <MenuItem Header="Ouvrir sur GitHub" Command="{Binding OpenOnGitHubCommand}" IsEnabled="{Binding CanOpenOnGitHub}" />
                                         <Separator />
                                         <MenuItem Header="Copier le chemin" Command="{Binding CopyPathCommand}" />
-                                        <Separator Visibility="{Binding IsExtra, Converter={StaticResource BoolToVisibility}}" />
+                                        <Separator />
+                                        <MenuItem Header="Masquer de la liste…" Command="{Binding HideCommand}"
+                                                  ToolTip="Le projet reste sur le disque ; il se réaffiche depuis Paramètres › Projets" />
                                         <MenuItem Header="Retirer de GitSpread" Command="{Binding RemoveFromListCommand}"
                                                   Visibility="{Binding IsExtra, Converter={StaticResource BoolToVisibility}}" />
                                     </ContextMenu>
@@ -267,7 +269,8 @@
                                     <TextBlock Text="{Binding LastAction.Title}" FontWeight="SemiBold" />
                                 </StackPanel>
                                 <TextBox Text="{Binding LastAction.Message, Mode=OneWay}" Style="{StaticResource SelectableText}" Margin="0,4,0,0" />
-                                <Expander Style="{StaticResource Section}" Header="COMMANDES EXÉCUTÉES" Margin="0,8,0,0" IsExpanded="{Binding Sections.ActionCommands}">
+                                <Expander Style="{StaticResource Section}" Header="COMMANDES EXÉCUTÉES" Margin="0,8,0,0" IsExpanded="{Binding Sections.ActionCommands}"
+                                  Visibility="{Binding ShowCommands, Source={x:Static vm:DisplayPreferences.Current}, Converter={StaticResource BoolToVisibility}}">
                                     <TextBox Text="{Binding LastAction.Commands, Mode=OneWay}" Style="{StaticResource SelectableText}" FontFamily="Consolas" FontSize="12"
                                              Foreground="{DynamicResource Muted}" />
                                 </Expander>

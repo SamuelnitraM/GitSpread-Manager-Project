@@ -22,7 +22,8 @@ public sealed partial class CloneViewModel : FormViewModel
         _account = account;
         _repository = repository;
         _host = host;
-        ParentFolder = host.Settings.RootFolders.FirstOrDefault(Directory.Exists)
+        ParentFolder = (host.Settings.CloneFolder is { Length: > 0 } preferred && Directory.Exists(preferred) ? preferred : null)
+                       ?? host.Settings.RootFolders.FirstOrDefault(Directory.Exists)
                        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "source", "repos");
         FolderName = repository.Name;
     }
@@ -31,7 +32,7 @@ public sealed partial class CloneViewModel : FormViewModel
 
     public string FullName => _repository.FullName;
     public string Url => _repository.Url + ".git";
-    public string SignLabel => $"Signer les commits de ce projet en tant que {_account.Login} (adresse privée GitHub)";
+    public string SignLabel => $"Signer les commits de ce projet en tant que {_account.Login} ({_host.EmailKind()})";
     public string TargetPath => Path.Combine(ParentFolder.Trim(), FolderName.Trim());
     public string CommandPreview => $"git clone {Url} \"{TargetPath}\"   (avec le compte {_account.Login})";
 
@@ -97,8 +98,9 @@ public sealed partial class CloneViewModel : FormViewModel
             if (SignWithAccount && await _host.GetAccountUserAsync(_account) is { } user)
             {
                 Progress.Add("Identité des commits du projet…");
-                await _host.Services.Git.SetLocalIdentityAsync(target, user.Name ?? user.Login, user.NoReplyEmail);
-                signed = $" Ses commits seront signés {user.Name ?? user.Login} <{user.NoReplyEmail}>.";
+                var identity = _host.IdentityFor(_account, user);
+                await _host.Services.Git.SetLocalIdentityAsync(target, identity.Name!, identity.Email!);
+                signed = $" Ses commits seront signés {identity.Name} <{identity.Email}>.";
             }
 
             // Cloné depuis l'onglet d'un collaborateur : c'est ce compte qui enverra, même si le propriétaire est connecté (F3A).

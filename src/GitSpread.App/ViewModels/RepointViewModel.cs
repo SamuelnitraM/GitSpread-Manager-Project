@@ -35,6 +35,7 @@ public sealed partial class RepointViewModel : FormViewModel
         _host = host;
         _logger = host.Services.LoggerFactory.CreateLogger<RepointViewModel>();
         _nameCheck = new RepositoryNameCheck(host.Services.GitHub);
+        IsPrivate = host.Settings.NewRepositoriesPrivate;
 
         Accounts = host.Accounts.Where(a => a.IsAuthenticated).ToList();
         SelectedAccount = Accounts.FirstOrDefault(a => a.Login == targetAccount?.Login && a.Host == targetAccount.Host)
@@ -104,10 +105,10 @@ public sealed partial class RepointViewModel : FormViewModel
     [ObservableProperty] public partial bool KeepOldLink { get; set; } = true;
     [ObservableProperty] public partial bool PushAllBranches { get; set; } = true;
 
-    /// <summary>Après le changement, signer les commits avec l'identité du compte cible (adresse privée GitHub).</summary>
+    /// <summary>Après le changement, signer les commits avec l'identité du compte cible (adresse choisie dans les paramètres).</summary>
     [ObservableProperty] public partial bool SignWithTarget { get; set; }
     public string SignWithTargetLabel => SelectedAccount is { } a
-        ? $"Signer désormais les commits de ce projet en tant que {a.Login} (adresse privée GitHub)"
+        ? $"Signer désormais les commits de ce projet en tant que {a.Login} ({_host.EmailKind()})"
         : "";
 
     [ObservableProperty] public partial string? TargetSummary { get; set; }
@@ -299,7 +300,7 @@ public sealed partial class RepointViewModel : FormViewModel
         else if (BuildPlan() is { } plan)
             foreach (var line in TransferService.Preview(plan, _project.Remote?.Url, _project.BranchLabel)) Preview.Add(line);
         if (SignWithTarget && SelectedAccount is { } signer)
-            Preview.Add($"git config --local user.name / user.email   (identité de {signer.Login}, adresse privée GitHub)");
+            Preview.Add($"git config --local user.name / user.email   (identité de {signer.Login}, {_host.EmailKind()})");
     }
 
     [RelayCommand]
@@ -363,9 +364,10 @@ public sealed partial class RepointViewModel : FormViewModel
         if (!SignWithTarget || SelectedAccount is not { } account) return "";
         if (await _host.GetAccountUserAsync(account) is not { } user)
             return $" L'identité de {account.Login} n'a pas pu être lue sur GitHub : choisis-la dans « Commits signés par ».";
-        var results = await _host.Services.Git.SetLocalIdentityAsync(_project.Path, user.Name ?? user.Login, user.NoReplyEmail);
+        var identity = _host.IdentityFor(account, user);
+        var results = await _host.Services.Git.SetLocalIdentityAsync(_project.Path, identity.Name!, identity.Email!);
         return results.All(r => r.Succeeded)
-            ? $" Les prochains commits seront signés {user.Name ?? user.Login} <{user.NoReplyEmail}>."
+            ? $" Les prochains commits seront signés {identity.Name} <{identity.Email}>."
             : $" L'identité n'a pas pu être changée : {results.First(r => !r.Succeeded).Output}";
     }
 

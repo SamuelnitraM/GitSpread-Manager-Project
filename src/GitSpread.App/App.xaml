@@ -15,6 +15,7 @@
             <app:EnumToVisibilityConverter x:Key="EnumToVisibility" />
             <app:EnumToBoolConverter x:Key="EnumToBool" />
             <app:NotConverter x:Key="Not" />
+            <app:NullToCollapsedConverter x:Key="NullToCollapsed" />
             <app:BranchColorToBrushConverter x:Key="BranchBrush" />
 
             <!-- Petite pastille (actif, privé, archivé...) -->

@@ -26,6 +26,20 @@ public sealed partial class GitHubService(GhCli gh, AccountService accounts)
 
     private const string RepoFields = "name,owner,url,sshUrl,visibility,description,isArchived,isFork,pushedAt";
 
+    /// <summary>Version de la GitHub CLI installée (« 2.62.0 »), ou null si gh ne répond pas.</summary>
+    public async Task<string?> GetCliVersionAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await gh.RunAsync(["--version"], cancellationToken: cancellationToken);
+            // « gh version 2.62.0 (2024-11-14) »
+            return result.Succeeded && result.StandardOutput.Split('\n')[0].Trim() is { } line && line.StartsWith("gh version ")
+                ? line["gh version ".Length..]
+                : null;
+        }
+        catch (Processes.ToolNotFoundException) { return null; }
+    }
+
     /// <summary>
     /// Repos dont le compte est propriétaire. gh utilise le token du compte (GH_TOKEN) et non le compte
     /// actif : sans ça, les repos privés d'un compte inactif seraient invisibles.

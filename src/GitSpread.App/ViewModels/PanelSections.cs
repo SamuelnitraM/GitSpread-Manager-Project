@@ -5,9 +5,31 @@ namespace GitSpread.App.ViewModels;
 /// <summary>
 /// Sections repliables des panneaux (F6c), ouvertes ou repliées au choix : l'état est mémorisé et vaut pour tous
 /// les projets et tous les repos. La zone sensible d'un repo GitHub et la sortie brute des commandes sont repliées par défaut.
+/// Si la mémorisation est désactivée dans les paramètres (F6d), l'état ne dure que le temps de la session.
 /// </summary>
-public sealed class PanelSections(IProjectHost host) : ObservableObject
+public sealed class PanelSections : ObservableObject
 {
+    private static readonly List<WeakReference<PanelSections>> Instances = [];
+    private readonly IProjectHost _host;
+
+    public PanelSections(IProjectHost host)
+    {
+        _host = host;
+        lock (Instances)
+        {
+            Instances.RemoveAll(w => !w.TryGetTarget(out _));
+            Instances.Add(new WeakReference<PanelSections>(this));
+        }
+    }
+
+    /// <summary>Après une réinitialisation : tous les panneaux ouverts reprennent l'état par défaut de leurs parties.</summary>
+    public static void RefreshAll()
+    {
+        List<PanelSections> alive;
+        lock (Instances) alive = Instances.Select(w => w.TryGetTarget(out var s) ? s : null).OfType<PanelSections>().ToList();
+        foreach (var sections in alive) sections.OnPropertyChanged(string.Empty);
+    }
+
     // Panneau d'un projet local
     public bool Links { get => Get(); set => Set(value); }
     public bool Branches { get => Get(); set => Set(value); }
@@ -32,14 +54,16 @@ public sealed class PanelSections(IProjectHost host) : ObservableObject
     public bool ActionCommands { get => Get(); set => Set(value); }
     public bool ActionOutput { get => Get(defaultOpen: false); set => Set(value); }
 
+    private Dictionary<string, bool> Store => _host.Settings.RememberSections ? _host.Settings.PanelSections : _host.Settings.SessionSections;
+
     private bool Get(bool defaultOpen = true, [System.Runtime.CompilerServices.CallerMemberName] string key = "") =>
-        host.Settings.PanelSections.TryGetValue(key, out var open) ? open : defaultOpen;
+        Store.TryGetValue(key, out var open) ? open : defaultOpen;
 
     private void Set(bool open, [System.Runtime.CompilerServices.CallerMemberName] string key = "")
     {
-        if (host.Settings.PanelSections.TryGetValue(key, out var current) && current == open) return;
-        host.Settings.PanelSections[key] = open;
-        host.SaveSettings();
+        if (Store.TryGetValue(key, out var current) && current == open) return;
+        Store[key] = open;
+        if (_host.Settings.RememberSections) _host.SaveSettings();
         OnPropertyChanged(key);
     }
 }

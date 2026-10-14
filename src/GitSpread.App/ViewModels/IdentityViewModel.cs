@@ -42,7 +42,7 @@ public sealed partial class IdentityViewModel(string path, IProjectHost host) : 
         {
             user = await host.GetAccountUserAsync(account); // null hors ligne : avertissement générique
         }
-        Suggested = user is null ? null : new GitIdentity(user.Name ?? user.Login, user.NoReplyEmail);
+        Suggested = user is null || account is null ? null : host.IdentityFor(account, user);
 
         var known = account is not null && host.Settings.IsKnownEmail(account.Host, account.Login, identity.Email);
         _unrecognised = null;

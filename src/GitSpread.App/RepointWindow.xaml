@@ -173,8 +173,10 @@
                         </StackPanel>
                     </CheckBox>
 
-                    <TextBlock Text="Ce que GitSpread va exécuter" Style="{StaticResource FieldLabel}" />
-                    <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8">
+                    <TextBlock Text="Ce que GitSpread va exécuter" Style="{StaticResource FieldLabel}"
+                               Visibility="{Binding ShowCommands, Source={x:Static vm:DisplayPreferences.Current}, Converter={StaticResource BoolToVisibility}}" />
+                    <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8"
+                            Visibility="{Binding ShowCommands, Source={x:Static vm:DisplayPreferences.Current}, Converter={StaticResource BoolToVisibility}}">
                         <ItemsControl ItemsSource="{Binding Preview}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

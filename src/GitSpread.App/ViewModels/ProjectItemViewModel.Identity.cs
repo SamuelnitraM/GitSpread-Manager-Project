@@ -61,15 +61,18 @@ public sealed partial class ProjectItemViewModel
             : (await Git.ListUnpushedCommitsAsync(Path)).Count(c => !c.AuthorEmail.Equals(effective.Email, StringComparison.OrdinalIgnoreCase));
         if (version != _identityVersion) return; // un chargement plus récent a pris le relais
 
-        // 2. Menu : une entrée par compte connecté (adresse privée GitHub recommandée, puis e-mails réels connus)
+        // 2. Menu : une entrée par compte connecté (adresse privée GitHub, puis e-mails réels connus) ; l'adresse choisie
+        //    dans les paramètres est marquée « recommandé »
         var choices = new List<IdentityChoice>();
         foreach (var (account, user) in users)
         {
             if (user is null) continue;
             var name = user.Name ?? user.Login;
-            choices.Add(new(IdentityChoiceKind.AccountNoReply, $"{account.Login} · adresse privée GitHub (recommandé)", new(name, user.NoReplyEmail), account));
+            var preferred = host.Settings.SigningEmail(account.Host, account.Login, user.NoReplyEmail, user.Email);
+            string Mark(string email) => email.Equals(preferred, StringComparison.OrdinalIgnoreCase) ? " (recommandé)" : "";
+            choices.Add(new(IdentityChoiceKind.AccountNoReply, $"{account.Login} · adresse privée GitHub{Mark(user.NoReplyEmail)}", new(name, user.NoReplyEmail), account));
             foreach (var email in KnownEmails(account, user))
-                choices.Add(new(IdentityChoiceKind.AccountEmail, $"{account.Login} · {email}", new(name, email), account));
+                choices.Add(new(IdentityChoiceKind.AccountEmail, $"{account.Login} · {email}{Mark(email)}", new(name, email), account));
         }
         if (settings.Global is { Email: not null } global)
             choices.Add(new(IdentityChoiceKind.Machine, $"Identité du poste · {Describe(global)}", global));

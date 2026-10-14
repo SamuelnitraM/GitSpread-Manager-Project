@@ -31,6 +31,35 @@ public sealed partial class GitService
             global is { Name: null, Email: null } ? null : global);
     }
 
+    /// <summary>Identité globale du poste (git config --global), utilisée par tous les projets sans réglage propre.</summary>
+    public async Task<GitIdentity> GetGlobalIdentityAsync(CancellationToken ct = default)
+    {
+        async Task<string?> Get(string key)
+        {
+            var r = await RunAsync(Environment.CurrentDirectory, ["config", "--global", "--get", key], null, ct);
+            return r.Succeeded && r.StandardOutput.Trim() is { Length: > 0 } v ? v : null;
+        }
+        return new GitIdentity(await Get("user.name"), await Get("user.email"));
+    }
+
+    /// <summary>Change l'identité globale du poste. Les projets qui ont leur propre identité ne sont pas concernés.</summary>
+    public async Task<IReadOnlyList<GitResult>> SetGlobalIdentityAsync(string name, string email, CancellationToken ct = default) =>
+    [
+        await ActAsync(Environment.CurrentDirectory, ["config", "--global", "user.name", name], null, ct),
+        await ActAsync(Environment.CurrentDirectory, ["config", "--global", "user.email", email], null, ct),
+    ];
+
+    /// <summary>Version de git installée (« 2.47.1.windows.1 »), ou null si git ne répond pas.</summary>
+    public async Task<string?> GetVersionAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var r = await RunAsync(Environment.CurrentDirectory, ["--version"], null, ct);
+            return r.Succeeded ? r.StandardOutput.Trim().Replace("git version ", "") : null;
+        }
+        catch (Processes.ToolNotFoundException) { return null; }
+    }
+
     /// <summary>Retire l'identité propre au projet : git utilisera de nouveau l'identité globale du poste.</summary>
     public async Task<IReadOnlyList<GitResult>> UnsetLocalIdentityAsync(string repositoryPath, CancellationToken ct = default)
     {

@@ -63,7 +63,7 @@ public sealed partial class GitHubRepositoryViewModel(AccountTabViewModel tab, G
     public string FactsLabel => Details is not { } d ? "" : string.Join("  ·  ", new[]
     {
         d.DefaultBranch is { } b ? $"branche principale « {b} »" : "aucun commit",
-        d.PushedAt is { } p ? $"dernier envoi {RepositoryItemViewModel.Relative(p)}" : null,
+        d.PushedAt is { } p ? $"dernier envoi {DisplayPreferences.Date(p)}" : null,
         d.CreatedAt is { } c ? $"créé le {c.LocalDateTime:d MMMM yyyy}" : null,
         $"{d.Stars} étoile{(d.Stars > 1 ? "s" : "")}",
         $"{d.Forks} fork{(d.Forks > 1 ? "s" : "")}",

@@ -29,7 +29,7 @@ public sealed partial class RepositoryItemViewModel(GitHubRepository repository,
         _ => "Public",
     };
 
-    public string PushedLabel => Repository.PushedAt is { } date ? Relative(date) : "jamais";
+    public string PushedLabel => Repository.PushedAt is { } date ? DisplayPreferences.Date(date) : "jamais";
 
     public string PushedTooltip => Repository.PushedAt?.LocalDateTime.ToString("dddd d MMMM yyyy 'à' HH:mm") ?? "";
 
@@ -45,18 +45,4 @@ public sealed partial class RepositoryItemViewModel(GitHubRepository repository,
     [RelayCommand] private void Open() => Shell.Open(Url);
     [RelayCommand] private void CopyHttpsUrl() => Shell.Copy(Url + ".git");
     [RelayCommand] private void CopySshUrl() => Shell.Copy(Repository.SshUrl);
-
-    internal static string Relative(DateTimeOffset date)
-    {
-        var elapsed = DateTimeOffset.Now - date;
-        return elapsed switch
-        {
-            { TotalMinutes: < 1 } => "à l'instant",
-            { TotalHours: < 1 } => $"il y a {(int)elapsed.TotalMinutes} min",
-            { TotalDays: < 1 } => $"il y a {(int)elapsed.TotalHours} h",
-            { TotalDays: < 30 } => $"il y a {(int)elapsed.TotalDays} j",
-            { TotalDays: < 365 } => $"il y a {(int)(elapsed.TotalDays / 30)} mois",
-            _ => $"il y a {(int)(elapsed.TotalDays / 365)} an{((int)(elapsed.TotalDays / 365) > 1 ? "s" : "")}",
-        };
-    }
 }

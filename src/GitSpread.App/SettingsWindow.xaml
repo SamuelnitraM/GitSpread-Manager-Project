@@ -1,0 +1,476 @@
+<Window x:Class="GitSpread.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:GitSpread.App.ViewModels"
+        mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+        Title="Paramètres" Width="900" Height="680" MinWidth="720" MinHeight="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}" FontFamily="Segoe UI" FontSize="13">
+
+    <Window.Resources>
+        <!-- Entrée du menu de gauche -->
+        <Style x:Key="NavItem" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Item" Background="Transparent" CornerRadius="6" Padding="12,8">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Item" Property="Background" Value="{DynamicResource TabHover}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Item" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="19" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style x:Key="Group" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Surface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16,12,16,14" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+        </Style>
+        <Style x:Key="GroupTitle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+        <Style x:Key="Option" TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+        <Style x:Key="Check" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+
+        <!-- Liste de chemins avec un bouton par ligne -->
+        <DataTemplate x:Key="PathRow">
+            <DockPanel Margin="0,3">
+                <ContentPresenter DockPanel.Dock="Right" Content="{Binding}"
+                                  ContentTemplate="{Binding Tag, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                <TextBlock Text="&#xE8B7;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Muted}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding}" />
+            </DockPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,12">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Fermer" IsDefault="True" IsCancel="True" Click="Close_Click" />
+                <TextBlock Text="Chaque réglage s'applique tout de suite. Si les dossiers ont changé, GitSpread analyse de nouveau tes projets à la fermeture."
+                           Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,16,0" />
+            </DockPanel>
+        </Border>
+
+        <!-- Menu -->
+        <Border DockPanel.Dock="Left" Width="210" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,1,0" Padding="10,16">
+            <StackPanel>
+                <RadioButton Style="{StaticResource NavItem}" IsChecked="{Binding Page, Converter={StaticResource EnumToBool}, ConverterParameter=Appearance}" AutomationProperties.Name="Apparence">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE790;" Style="{StaticResource Glyph}" Margin="0,0,10,0" /><TextBlock Text="Apparence" /></StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" IsChecked="{Binding Page, Converter={StaticResource EnumToBool}, ConverterParameter=Git}" AutomationProperties.Name="Git et GitHub">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" Style="{StaticResource Glyph}" Margin="0,0,10,0" /><TextBlock Text="Git et GitHub" /></StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" IsChecked="{Binding Page, Converter={StaticResource EnumToBool}, ConverterParameter=Projects}" AutomationProperties.Name="Projets">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8B7;" Style="{StaticResource Glyph}" Margin="0,0,10,0" /><TextBlock Text="Projets" /></StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" IsChecked="{Binding Page, Converter={StaticResource EnumToBool}, ConverterParameter=Accounts}" AutomationProperties.Name="Comptes et identités">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE77B;" Style="{StaticResource Glyph}" Margin="0,0,10,0" /><TextBlock Text="Comptes et identités" /></StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource NavItem}" IsChecked="{Binding Page, Converter={StaticResource EnumToBool}, ConverterParameter=Advanced}" AutomationProperties.Name="Avancé">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE9F5;" Style="{StaticResource Glyph}" Margin="0,0,10,0" /><TextBlock Text="Avancé" /></StackPanel>
+                </RadioButton>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="24,18,24,24">
+
+                <!-- ================= Apparence ================= -->
+                <StackPanel Visibility="{Binding Page, Converter={StaticResource EnumToVisibility}, ConverterParameter=Appearance}">
+                    <TextBlock Text="Apparence" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="Ce que tu vois en ouvrant GitSpread, et comment c'est affiché." Style="{StaticResource Hint}" />
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Vue principale" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Text="Ce qu'affiche un onglet la première fois que tu l'ouvres." Style="{StaticResource Hint}" />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding StartWithList}" GroupName="MainView">
+                                <TextBlock TextWrapping="Wrap"><Run Text="Liste des projets" FontWeight="SemiBold" /><Run Text="  avec l'aperçu de l'historique en bas" Foreground="{DynamicResource Muted}" /></TextBlock>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding StartWithHistory}" GroupName="MainView">
+                                <TextBlock TextWrapping="Wrap"><Run Text="Arborescence (historique en grand)" FontWeight="SemiBold" /><Run Text="  « Retour aux projets » ramène à la liste" Foreground="{DynamicResource Muted}" /></TextBlock>
+                            </RadioButton>
+                            <CheckBox Style="{StaticResource Check}" IsChecked="{Binding ShowHistoryPreview}" Margin="0,14,0,0">
+                                <TextBlock Text="Afficher l'aperçu de l'historique en bas de la liste (sa hauteur est mémorisée quand tu le redimensionnes)" TextWrapping="Wrap" />
+                            </CheckBox>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Thème" Style="{StaticResource GroupTitle}" />
+                            <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" DisplayMemberPath="Label"
+                                      Width="200" HorizontalAlignment="Left" Margin="0,8,0,0" AutomationProperties.Name="Thème" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Format des dates" Style="{StaticResource GroupTitle}" />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding FullDates, Converter={StaticResource Not}}" GroupName="Dates" Content="Relatif : « il y a 2 j »" />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding FullDates}" GroupName="Dates" Content="Complet : « 13/10/2026 14:05 »" />
+                            <TextBlock Text="{Binding DateExample}" Style="{StaticResource Hint}" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Branches de maintenance" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Une branche dont le nom commence par l'un de ces mots est colorée en jaune, orange ou rouge dans l'historique (fix/login, hotfix-2.1…). Les autres sont en bleu clair. Sépare les mots par des virgules." />
+                            <DockPanel Margin="0,8,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Liste par défaut" Command="{Binding ResetMaintenanceTermsCommand}" Margin="8,0,0,0" />
+                                <TextBox Text="{Binding MaintenanceTermsText}" Padding="6,4" AutomationProperties.Name="Termes de maintenance" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ================= Git et GitHub ================= -->
+                <StackPanel Visibility="{Binding Page, Converter={StaticResource EnumToVisibility}, ConverterParameter=Git}">
+                    <TextBlock Text="Git et GitHub" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="Les choix proposés par défaut dans les assistants." Style="{StaticResource Hint}" />
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Commandes git" Style="{StaticResource GroupTitle}" />
+                            <CheckBox Style="{StaticResource Check}" IsChecked="{Binding ShowCommands}">
+                                <TextBlock Text="Afficher les commandes que GitSpread va exécuter, puis celles qu'il a exécutées" TextWrapping="Wrap" />
+                            </CheckBox>
+                            <TextBlock Style="{StaticResource Hint}" Text="Utile pour apprendre git : tu vois l'équivalent de chaque action dans un terminal." />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Nouveaux repos" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Visibilité cochée par défaut quand tu publies un projet ou crées un repo." />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding NewRepositoriesPrivate}" GroupName="Visibility" Content="Privé : visible seulement par toi et tes collaborateurs (recommandé)" />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding NewRepositoriesPublic}" GroupName="Visibility" Content="Public : visible par tout le monde" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Adresse pour signer les commits" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Adresse proposée quand GitSpread règle l'identité d'un projet sur un compte (publication, clonage, changement de compte)." />
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding PreferNoReplyEmail}" GroupName="Email">
+                                <TextBlock TextWrapping="Wrap"><Run Text="Adresse privée GitHub (noreply)" FontWeight="SemiBold" /><Run Text="  ton vrai e-mail n'apparaît pas dans l'historique (recommandé)" Foreground="{DynamicResource Muted}" /></TextBlock>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource Option}" IsChecked="{Binding PreferRealEmail}" GroupName="Email">
+                                <TextBlock TextWrapping="Wrap"><Run Text="Adresse réelle du compte" FontWeight="SemiBold" /><Run Text="  la première adresse connue du compte (voir Comptes et identités), sinon la privée" Foreground="{DynamicResource Muted}" /></TextBlock>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Dossier pour cloner" Style="{StaticResource GroupTitle}" />
+                            <DockPanel Margin="0,8,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Parcourir…" Click="BrowseClone_Click" Margin="8,0,0,0" />
+                                <TextBox x:Name="CloneFolderBox" Text="{Binding CloneFolder}" Padding="6,4" AutomationProperties.Name="Dossier pour cloner" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding CloneFolderHint}" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Historique" Style="{StaticResource GroupTitle}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock Text="Commits chargés à chaque fois :" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding PageSizes}" SelectedItem="{Binding HistoryPageSize}" Width="90" AutomationProperties.Name="Commits chargés" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Hint}" Text="« Afficher plus » charge la suite. Un nombre plus grand montre plus loin dans le passé mais s'ouvre moins vite." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ================= Projets ================= -->
+                <StackPanel Visibility="{Binding Page, Converter={StaticResource EnumToVisibility}, ConverterParameter=Projects}">
+                    <TextBlock Text="Projets" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="Où GitSpread cherche tes projets, et ceux que tu as ajoutés ou masqués." Style="{StaticResource Hint}" />
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Click="AddFolder_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" Margin="0,0,6,0" />
+                                        <TextBlock Text="Ajouter un dossier" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel>
+                                    <TextBlock Text="Dossiers analysés" Style="{StaticResource GroupTitle}" />
+                                    <TextBlock Style="{StaticResource Hint}" Text="GitSpread parcourt ces dossiers et leurs sous-dossiers pour trouver tes projets." />
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Text="Aucun dossier : indique où chercher tes projets." Foreground="{DynamicResource Warning}" Margin="0,10,0,0"
+                                       Visibility="{Binding HasNoRootFolders, Converter={StaticResource BoolToVisibility}}" />
+                            <ItemsControl ItemsSource="{Binding RootFolders}" ItemTemplate="{StaticResource PathRow}" Margin="0,8,0,0">
+                                <ItemsControl.Tag>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource GhostButton}" Content="Retirer" FontSize="12"
+                                                Command="{Binding DataContext.RemoveRootFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                                AutomationProperties.Name="{Binding StringFormat=Retirer le dossier {0}}" />
+                                    </DataTemplate>
+                                </ItemsControl.Tag>
+                            </ItemsControl>
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <TextBlock Text="Profondeur de recherche :" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding Depths}" SelectedItem="{Binding ScanDepth}" Width="60" AutomationProperties.Name="Profondeur de recherche"
+                                          ToolTip="Nombre maximum de niveaux de sous-dossiers explorés sous chaque dossier" />
+                            </StackPanel>
+                            <TextBlock Text="Dossiers ignorés" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Noms de dossiers jamais parcourus (dépendances, compilation…), séparés par des virgules. Les dossiers cachés sont toujours ignorés." />
+                            <DockPanel Margin="0,6,0,0">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Liste par défaut" Command="{Binding ResetExclusionsCommand}" Margin="8,0,0,0" />
+                                <TextBox Text="{Binding ExclusionsText}" Padding="6,4" TextWrapping="Wrap" AutomationProperties.Name="Dossiers ignorés" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Projets ajoutés à la main" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Ajoutés avec « Ajouter un projet » ou clonés hors des dossiers analysés. Les retirer ne touche pas à leurs fichiers." />
+                            <TextBlock Text="Aucun." Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                       Visibility="{Binding HasNoExtraProjects, Converter={StaticResource BoolToVisibility}}" />
+                            <ItemsControl ItemsSource="{Binding ExtraProjects}" ItemTemplate="{StaticResource PathRow}" Margin="0,8,0,0">
+                                <ItemsControl.Tag>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource GhostButton}" Content="Retirer" FontSize="12"
+                                                Command="{Binding DataContext.RemoveExtraProjectCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                                AutomationProperties.Name="{Binding StringFormat=Retirer le projet {0}}" />
+                                    </DataTemplate>
+                                </ItemsControl.Tag>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Projets masqués" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}" Text="Cachés de la liste (clic droit sur un projet › « Masquer de la liste »), sans être retirés du disque." />
+                            <TextBlock Text="Aucun." Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                       Visibility="{Binding HasNoHiddenProjects, Converter={StaticResource BoolToVisibility}}" />
+                            <ItemsControl ItemsSource="{Binding HiddenProjects}" ItemTemplate="{StaticResource PathRow}" Margin="0,8,0,0">
+                                <ItemsControl.Tag>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource GhostButton}" Content="Afficher" FontSize="12"
+                                                Command="{Binding DataContext.ShowProjectCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                                AutomationProperties.Name="{Binding StringFormat=Afficher le projet {0}}" />
+                                    </DataTemplate>
+                                </ItemsControl.Tag>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ================= Comptes et identités ================= -->
+                <StackPanel Visibility="{Binding Page, Converter={StaticResource EnumToVisibility}, ConverterParameter=Accounts}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Click="AddAccount_Click" VerticalAlignment="Top">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" Margin="0,0,6,0" />
+                                <TextBlock Text="Connecter un compte" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel>
+                            <TextBlock Text="Comptes et identités" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Tes comptes GitHub, leurs adresses e-mail, et l'identité utilisée par défaut sur ce poste." Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <TextBlock Text="Aucun compte connecté." Foreground="{DynamicResource Warning}" Margin="0,14,0,0"
+                               Visibility="{Binding HasNoAccounts, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding Accounts}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:AccountSettingsRow}">
+                                <Border Style="{StaticResource Group}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                <Button Style="{StaticResource GhostButton}" Content="Rendre actif" FontSize="12" Command="{Binding MakeActiveCommand}"
+                                                        Visibility="{Binding CanMakeActive, Converter={StaticResource BoolToVisibility}}"
+                                                        ToolTip="Compte utilisé par gh dans ton terminal. GitSpread, lui, choisit toujours le bon compte pour chaque projet." />
+                                                <Button Style="{StaticResource GhostButton}" Content="Autorisations…" FontSize="12" Command="{Binding ScopesCommand}" />
+                                                <Button Style="{StaticResource GhostButton}" Content="Profil" FontSize="12" Command="{Binding OpenProfileCommand}" />
+                                                <Button Style="{StaticResource GhostButton}" Content="Déconnecter…" FontSize="12" Command="{Binding LogoutCommand}" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Login}" Style="{StaticResource GroupTitle}" />
+                                                <TextBlock Text="{Binding HostLabel}" Foreground="{DynamicResource Muted}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                <Border Style="{StaticResource Pill}" Background="{DynamicResource SuccessSoft}" Margin="8,0,0,0"
+                                                        Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBlock Text="actif" FontSize="11" Foreground="{DynamicResource Success}" />
+                                                </Border>
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding StateLabel}" Style="{StaticResource Hint}" />
+                                        <TextBlock Text="{Binding ScopesLabel}" Style="{StaticResource Hint}" />
+
+                                        <TextBlock Text="ADRESSES E-MAIL" Style="{StaticResource SectionLabel}" />
+                                        <TextBlock TextWrapping="Wrap"><Run Text="Adresse privée GitHub : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding NoReplyEmail, Mode=OneWay}" /></TextBlock>
+                                        <TextBlock TextWrapping="Wrap" Margin="0,3,0,0" Visibility="{Binding HasPublicEmail, Converter={StaticResource BoolToVisibility}}">
+                                            <Run Text="Adresse publique du profil : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding PublicEmail, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Text="Adresses reconnues par GitSpread pour ce compte :" Foreground="{DynamicResource Muted}" Margin="0,6,0,0" />
+                                        <TextBlock Text="aucune" Style="{StaticResource Hint}" Margin="12,2,0,0"
+                                                   Visibility="{Binding HasNoKnownEmails, Converter={StaticResource BoolToVisibility}}" />
+                                        <ItemsControl ItemsSource="{Binding KnownEmails}" Margin="12,2,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                                                        <Button Style="{StaticResource GhostButton}" Content="Retirer" FontSize="12" Margin="8,0,0,0"
+                                                                Command="{Binding DataContext.RemoveEmailCommand, RelativeSource={RelativeSource AncestorType=ItemsControl, AncestorLevel=2}}"
+                                                                CommandParameter="{Binding}" AutomationProperties.Name="{Binding StringFormat=Retirer l’adresse {0}}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Style="{StaticResource GhostButton}" Content="+ Ajouter une adresse…" FontSize="12" HorizontalAlignment="Left" Margin="6,4,0,0"
+                                                Command="{Binding AddEmailCommand}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Identité globale du poste" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Utilisée par tous les projets qui n'ont pas leur propre identité (git config --global). Chaque projet peut avoir la sienne : panneau du projet › « Qui signe les commits »." />
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition />
+                                    <RowDefinition />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Nom" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <TextBox Grid.Column="1" Text="{Binding GlobalName, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" AutomationProperties.Name="Nom global" />
+                                <TextBlock Grid.Row="1" Text="E-mail" VerticalAlignment="Center" Margin="0,8,12,0" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GlobalEmail, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,8,0,0" AutomationProperties.Name="E-mail global" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Style="{StaticResource SecondaryButton}" Content="Enregistrer l'identité du poste" Command="{Binding SaveGlobalIdentityCommand}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding GlobalIdentityStatus}" TextWrapping="Wrap" Margin="0,8,0,0" FontSize="12">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource Success}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GlobalIdentityFailed}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource Warning}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ================= Avancé ================= -->
+                <StackPanel Visibility="{Binding Page, Converter={StaticResource EnumToVisibility}, ConverterParameter=Advanced}">
+                    <TextBlock Text="Avancé" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="Outils, stockage et remise à zéro." Style="{StaticResource Hint}" />
+
+                    <Border Background="{DynamicResource AccentSoft}" CornerRadius="8" Padding="14,8" Margin="0,14,0,0"
+                            Visibility="{Binding AdvancedStatus, Converter={StaticResource NullToCollapsed}}">
+                        <TextBlock Text="{Binding AdvancedStatus}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Outils détectés" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Margin="0,8,0,0"><Run Text="git : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding GitVersion, Mode=OneWay}" /></TextBlock>
+                            <TextBlock Margin="0,3,0,0"><Run Text="GitHub CLI (gh) : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding GhVersion, Mode=OneWay}" /></TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Parties repliables" Style="{StaticResource GroupTitle}" />
+                            <CheckBox Style="{StaticResource Check}" IsChecked="{Binding RememberSections}">
+                                <TextBlock Text="Mémoriser les parties repliées ou dépliées des panneaux (pour tous les projets et repos)" TextWrapping="Wrap" />
+                            </CheckBox>
+                            <TextBlock Style="{StaticResource Hint}" Text="Sinon, elles reprennent leur état par défaut à chaque lancement." />
+                            <Button Style="{StaticResource SecondaryButton}" Content="Tout remettre dans l'état par défaut" Command="{Binding ResetSectionsCommand}"
+                                    HorizontalAlignment="Left" Margin="0,10,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Copies légères des repos GitHub" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Pour afficher l'historique d'un repo pas encore cloné, GitSpread en garde une copie en lecture seule (historique seul, sans token)." />
+                            <TextBlock Margin="0,8,0,0" TextWrapping="Wrap"><Run Text="Place occupée : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding CacheSizeLabel, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="   " /><Run Text="{Binding CachePath, Mode=OneWay}" Foreground="{DynamicResource Muted}" FontSize="12" /></TextBlock>
+                            <Button Style="{StaticResource SecondaryButton}" Content="Vider le cache" Command="{Binding ClearCacheCommand}" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}">
+                        <StackPanel>
+                            <TextBlock Text="Fichiers de GitSpread" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Margin="0,8,0,0" TextWrapping="Wrap"><Run Text="Paramètres : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding SettingsPath, Mode=OneWay}" /></TextBlock>
+                            <TextBlock Margin="0,3,0,0" TextWrapping="Wrap"><Run Text="Journaux : " Foreground="{DynamicResource Muted}" /><Run Text="{Binding LogDirectory, Mode=OneWay}" /></TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Style="{StaticResource SecondaryButton}" Content="Ouvrir le dossier des journaux" Command="{Binding OpenLogsCommand}" Margin="0,0,8,0" />
+                                <Button Style="{StaticResource SecondaryButton}" Content="Afficher le fichier des paramètres" Command="{Binding OpenSettingsFolderCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Group}" BorderBrush="{DynamicResource Warning}">
+                        <StackPanel>
+                            <TextBlock Text="Réinitialiser les paramètres" Style="{StaticResource GroupTitle}" />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Remet les préférences par défaut. Tes dossiers, tes projets ajoutés, masqués ou rangés, l'ordre des onglets et les e-mails connus sont conservés. Les comptes ne sont pas touchés." />
+                            <Button Style="{StaticResource SecondaryButton}" Content="Réinitialiser…" Command="{Binding ResetPreferencesCommand}" HorizontalAlignment="Left" Margin="0,10,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -10,6 +10,7 @@ namespace GitSpread.App;
 public partial class MainWindow : Window
 {
     public static readonly RoutedCommand AddAccountCommand = new(nameof(AddAccountCommand), typeof(MainWindow));
+    public static readonly RoutedCommand SettingsCommand = new(nameof(SettingsCommand), typeof(MainWindow));
 
     public MainWindow()
     {
@@ -61,11 +62,19 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true) await ViewModel.AddProjectsAsync(dialog.FolderNames);
     }
 
-    private async void Folders_Click(object sender, RoutedEventArgs e)
+    // ------------------------------------------------------------ paramètres (F6d)
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings(SettingsPage.Appearance);
+    private void SettingsProjects_Click(object sender, RoutedEventArgs e) => OpenSettings(SettingsPage.Projects);
+
+    private async void OpenSettings(SettingsPage page)
     {
-        var dialog = new FoldersWindow(ViewModel.Settings.RootFolders, ViewModel.Settings.ScanDepth) { Owner = this };
-        if (dialog.ShowDialog() == true)
-            await ViewModel.UpdateRootFoldersAsync(dialog.Folders, dialog.Depth);
+        var settings = new SettingsViewModel(ViewModel, page)
+        {
+            ApplyTheme = theme => ThemeManager.Apply(ThemeManager.Parse(theme)),
+        };
+        new SettingsWindow(settings, ViewModel) { Owner = this }.ShowDialog();
+        await settings.CloseAsync();
     }
 
     private void OpenLogs_Click(object sender, RoutedEventArgs e)
@@ -108,24 +117,6 @@ public partial class MainWindow : Window
         logout.Click += async (_, _) => await ViewModel.LogoutAsync(account);
         menu.Items.Add(logout);
 
-        menu.IsOpen = true;
-    }
-
-    // ------------------------------------------------------------ thème
-
-    private void Theme_Click(object sender, RoutedEventArgs e)
-    {
-        var menu = new ContextMenu { PlacementTarget = (UIElement)sender, Placement = PlacementMode.Bottom };
-        foreach (var (theme, label) in new[] { (AppTheme.System, "Comme Windows"), (AppTheme.Light, "Clair"), (AppTheme.Dark, "Sombre") })
-        {
-            var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = ThemeManager.Current == theme };
-            item.Click += (_, _) =>
-            {
-                ThemeManager.Apply(theme);
-                ViewModel.SetTheme(theme.ToString());
-            };
-            menu.Items.Add(item);
-        }
         menu.IsOpen = true;
     }
 

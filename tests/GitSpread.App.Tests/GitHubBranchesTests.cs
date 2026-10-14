@@ -70,6 +70,22 @@ public class GitHubBranchesTests
     }
 
     [Fact]
+    public async Task Maintenance_terms_chosen_in_the_settings_decide_the_colours()
+    {
+        var host = new TestHost();
+        host.Settings.MaintenanceTerms = ["feature"];
+        host.Runner.When(["repo", "view"], """
+                {"name":"stock","owner":{"login":"SmartDev-Web"},"visibility":"PRIVATE","defaultBranchRef":{"name":"main"},"repositoryTopics":[],
+                 "isArchived":false,"isFork":false,"url":"https://github.com/SmartDev-Web/stock","viewerPermission":"ADMIN"}
+                """).When(["api"], "[]").When(["api", "graphql"], Branches);
+        var panel = new GitHubRepositoryViewModel(new AccountTabViewModel(TestHost.Pro, host, NullLogger.Instance), Stock, host, NullLogger.Instance);
+        await panel.LoadAsync();
+
+        Assert.Equal(BranchKind.Maintenance, panel.Branches.Single(b => b.Name == "feature/ancienne").Color.Kind);
+        Assert.Equal(BranchKind.Classic, panel.Branches.Single(b => b.Name == "fix/paiement").Color.Kind);
+    }
+
+    [Fact]
     public async Task Read_only_access_cannot_edit_branches()
     {
         var (_, panel) = await PanelAsync(permission: "READ");

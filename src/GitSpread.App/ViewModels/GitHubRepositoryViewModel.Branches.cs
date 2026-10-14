@@ -15,7 +15,7 @@ public sealed class GitHubBranchRow(GitHubBranch branch, bool isDefault, string?
     public bool IsDefault { get; } = isDefault;
     public BranchColor Color { get; } = color;
     public string LastCommit => Branch.Subject;
-    public string DateLabel => Branch.Date is { } d ? RepositoryItemViewModel.Relative(d) : "";
+    public string DateLabel => Branch.Date is { } d ? DisplayPreferences.Date(d) : "";
     public string StateLabel => IsDefault ? "branche principale" : (Branch.NotInDefault, Branch.DefaultAhead) switch
     {
         (0, 0) => $"identique à {defaultBranch}",
@@ -64,7 +64,7 @@ public sealed partial class GitHubRepositoryViewModel
             var shades = new Dictionary<BranchKind, int>();
             foreach (var b in branches.OrderByDescending(b => b.Name == main))
             {
-                var kind = BranchKinds.Of(b.Name, main);
+                var kind = BranchKinds.Of(b.Name, main, host.Settings.MaintenanceTerms);
                 var shade = shades.GetValueOrDefault(kind);
                 shades[kind] = shade + 1;
                 Branches.Add(new GitHubBranchRow(b, b.Name == main, main, new BranchColor(kind, shade)));

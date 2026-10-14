@@ -101,7 +101,10 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
                        ?? Items.FirstOrDefault(i => i.Project is { IsRepository: true })
                        ?? Items.FirstOrDefault();
         if (SelectedItem is null) LeftTab = 0;
+        _waitingForItems = SelectedItem is null; // ouvert au lancement (F6d), avant la fin de l'analyse des dossiers
     }
+
+    private bool _waitingForItems;
 
     /// <summary>Reconstruit la liste (projets de l'onglet, puis repos GitHub qui ne sont pas encore sur ce poste), sélection conservée.</summary>
     public void Refresh()
@@ -126,6 +129,7 @@ public sealed partial class HistoryExplorerViewModel : ObservableObject
             var again = Items.FirstOrDefault(i => i.Key.Equals(selectedKey, StringComparison.OrdinalIgnoreCase));
             if (again is not null && !again.Equals(SelectedItem)) SetSelectionQuietly(again);
         }
+        if (_waitingForItems && SelectedItem is null && Items.Count > 0) Start();
     }
 
     private bool _quiet;

@@ -64,5 +64,15 @@ public sealed class RepositoryCache(GitService git, GitCredentialResolver creden
         ? new DirectoryInfo(root).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
         : 0;
 
+    /// <summary>Supprime toutes les copies : elles seront refaites à la prochaine ouverture d'un historique.</summary>
+    public void Clear()
+    {
+        _fetchedAt.Clear();
+        if (!Directory.Exists(root)) return;
+        foreach (var file in new DirectoryInfo(root).EnumerateFiles("*", SearchOption.AllDirectories))
+            file.Attributes = FileAttributes.Normal; // git crée ses objets en lecture seule
+        Directory.Delete(root, recursive: true);
+    }
+
     private static string FirstLine(string output) => output.Split('\n').FirstOrDefault(l => l.Trim().Length > 0)?.Trim() ?? "échec sans message";
 }

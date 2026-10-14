@@ -15,10 +15,12 @@
 
     <Window.CommandBindings>
         <CommandBinding Command="{x:Static app:MainWindow.AddAccountCommand}" Executed="AddAccount_Executed" />
+        <CommandBinding Command="{x:Static app:MainWindow.SettingsCommand}" Executed="Settings_Click" />
     </Window.CommandBindings>
     <Window.InputBindings>
         <KeyBinding Key="F5" Command="{Binding RefreshCommand}" />
         <KeyBinding Key="N" Modifiers="Control" Command="{x:Static app:MainWindow.AddAccountCommand}" />
+        <KeyBinding Key="OemComma" Modifiers="Control" Command="{x:Static app:MainWindow.SettingsCommand}" />
     </Window.InputBindings>
 
     <Window.Resources>
@@ -195,10 +197,6 @@
         <Border DockPanel.Dock="Top" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,0,1" Padding="20,12">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Style="{StaticResource SecondaryButton}" Click="Theme_Click" Margin="0,0,8,0" Padding="9,5"
-                            AutomationProperties.Name="Thème" ToolTip="Thème : système, clair ou sombre">
-                        <TextBlock Text="&#xE793;" Style="{StaticResource Glyph}" FontSize="14" />
-                    </Button>
                     <Button Style="{StaticResource SecondaryButton}" Click="AddProject_Click" Margin="0,0,8,0"
                             ToolTip="Ajouter un ou plusieurs dossiers de projet, où qu'ils soient, même sans git">
                         <StackPanel Orientation="Horizontal">
@@ -206,11 +204,11 @@
                             <TextBlock Text="Ajouter un projet" />
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource SecondaryButton}" Click="Folders_Click" Margin="0,0,8,0"
-                            ToolTip="Choisir les dossiers où GitSpread cherche tes projets">
+                    <Button Style="{StaticResource SecondaryButton}" Click="Settings_Click" Margin="0,0,8,0" AutomationProperties.Name="Paramètres"
+                            ToolTip="Apparence, réglages git, dossiers de projets, comptes et identités (Ctrl+,)">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8B7;" Style="{StaticResource Glyph}" Margin="0,0,8,0" />
-                            <TextBlock Text="Dossiers" />
+                            <TextBlock Text="&#xE713;" Style="{StaticResource Glyph}" Margin="0,0,8,0" />
+                            <TextBlock Text="Paramètres" />
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource PrimaryButton}" Command="{Binding RefreshCommand}"
@@ -255,7 +253,7 @@
             <Border DockPanel.Dock="Top" Margin="0,0,0,10" Background="{DynamicResource AccentSoft}" CornerRadius="8" Padding="14,8"
                     Visibility="{Binding HasNoRootFolders, Converter={StaticResource BoolToVisibility}}">
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Choisir des dossiers" Click="Folders_Click" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Choisir des dossiers" Click="SettingsProjects_Click" />
                     <TextBlock Text="Aucun dossier de projets n'est configuré : indique à GitSpread où chercher tes projets." VerticalAlignment="Center" TextWrapping="Wrap" />
                 </DockPanel>
             </Border>

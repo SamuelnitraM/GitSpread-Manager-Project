@@ -148,7 +148,7 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
                 }.OfType<string>());
 
             LastCommitSubject = commit?.Subject ?? "Aucun commit pour l'instant";
-            LastCommitMeta = commit is null ? "" : $"{commit.ShortHash} · {commit.Author} · {RepositoryItemViewModel.Relative(commit.Date)}";
+            LastCommitMeta = commit is null ? "" : $"{commit.ShortHash} · {commit.Author} · {DisplayPreferences.Date(commit.Date)}";
 
             IdentityLabel = identity switch
             {
@@ -281,6 +281,15 @@ public sealed partial class ProjectItemViewModel(ProjectPlacement placement, IPr
     {
         if (host.Dialogs.Confirm($"Retirer « {Name} » de GitSpread ?\n\nLe dossier et ses fichiers ne sont pas touchés.", "Retirer de la liste"))
             await host.RemoveExtraProjectAsync(Path);
+    }
+
+    /// <summary>Cache le projet de la liste (F6d) ; il se réaffiche depuis Paramètres › Projets.</summary>
+    [RelayCommand]
+    private async Task HideAsync()
+    {
+        if (host.Dialogs.Confirm($"Masquer « {Name} » de la liste ?\n\nLe dossier et ses fichiers ne sont pas touchés. "
+                + "Tu pourras le réafficher dans Paramètres › Projets.", "Masquer le projet"))
+            await host.HideProjectAsync(Path);
     }
 
     [RelayCommand] private void OpenFolder() => Shell.ShowInExplorer(Path);

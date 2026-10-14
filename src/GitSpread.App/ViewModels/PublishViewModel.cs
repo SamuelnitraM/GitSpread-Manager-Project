@@ -28,6 +28,7 @@ public sealed partial class PublishViewModel : FormViewModel
         _logger = host.Services.LoggerFactory.CreateLogger<PublishViewModel>();
         _nameCheck = new RepositoryNameCheck(host.Services.GitHub);
         Identity = new IdentityViewModel(project.Path, host);
+        IsPrivate = host.Settings.NewRepositoriesPrivate;
 
         Accounts = host.Accounts.Where(a => a.IsAuthenticated).ToList();
         SelectedAccount = project.Placement.Account

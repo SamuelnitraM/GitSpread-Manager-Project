@@ -22,7 +22,7 @@ public sealed class HistoryRowViewModel(HistoryCommit commit, GraphRow graph, IR
     public string Subject => Commit.Subject;
     public string Author => Commit.Author;
     public string ShortSha => Commit.ShortSha;
-    public string DateLabel => RepositoryItemViewModel.Relative(Commit.Date);
+    public string DateLabel => DisplayPreferences.Date(Commit.Date);
     public string DateTooltip => Commit.Date.LocalDateTime.ToString("dddd d MMMM yyyy 'à' HH:mm");
     public override string ToString() => $"{ShortSha} {Subject}";
 }
@@ -36,7 +36,7 @@ public sealed class BranchRowViewModel(BranchOverview overview, BranchColor colo
     public string Name => Overview.Name;
     public string StateLabel { get; } = state;
     public string LastCommit => Overview.Subject;
-    public string DateLabel => Overview.Date is { } d ? RepositoryItemViewModel.Relative(d) : "";
+    public string DateLabel => Overview.Date is { } d ? DisplayPreferences.Date(d) : "";
     public bool IsCurrent => Overview.Info.IsCurrent;
     public bool IsRemoteOnly => Overview.Info.IsRemoteOnly;
     public string? DefaultBranch { get; } = defaultBranch;
@@ -276,7 +276,7 @@ public sealed partial class HistoryViewModel(IProjectHost host, bool withDetails
             tips.Add((b.Name, b.TipSha));
             if (b.RemoteTipSha is { } remoteTip && remoteTip != b.TipSha) tips.Add((b.Name, remoteTip));
         }
-        var layout = HistoryGraph.Layout(_commits, tips, _defaultBranch);
+        var layout = HistoryGraph.Layout(_commits, tips, _defaultBranch, Host.Settings.MaintenanceTerms);
 
         Rows.Clear();
         for (var i = 0; i < _commits.Count; i++)

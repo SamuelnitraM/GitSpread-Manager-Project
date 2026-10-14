@@ -360,7 +360,8 @@
                                 <TextBlock Text="{Binding LastAction.Title}" FontWeight="SemiBold" />
                             </StackPanel>
                             <TextBox Text="{Binding LastAction.Message, Mode=OneWay}" Style="{StaticResource SelectableText}" Margin="0,4,0,0" />
-                            <Expander Style="{StaticResource Section}" Header="COMMANDES EXÉCUTÉES" Margin="0,8,0,0" IsExpanded="{Binding Sections.ActionCommands}">
+                            <Expander Style="{StaticResource Section}" Header="COMMANDES EXÉCUTÉES" Margin="0,8,0,0" IsExpanded="{Binding Sections.ActionCommands}"
+                                  Visibility="{Binding ShowCommands, Source={x:Static vm:DisplayPreferences.Current}, Converter={StaticResource BoolToVisibility}}">
                                 <TextBox Text="{Binding LastAction.Commands, Mode=OneWay}" Style="{StaticResource SelectableText}" FontFamily="Consolas" FontSize="12"
                                          Foreground="{DynamicResource Muted}" />
                             </Expander>

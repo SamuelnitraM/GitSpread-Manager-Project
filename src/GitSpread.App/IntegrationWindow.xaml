@@ -84,7 +84,8 @@
                         </CheckBox>
                     </StackPanel>
 
-                    <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
+                    <Border Background="{DynamicResource CodeBg}" CornerRadius="8" Padding="12,8" Margin="0,12,0,0"
+                            Visibility="{Binding ShowCommands, Source={x:Static vm:DisplayPreferences.Current}, Converter={StaticResource BoolToVisibility}}">
                         <ItemsControl ItemsSource="{Binding Preview}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

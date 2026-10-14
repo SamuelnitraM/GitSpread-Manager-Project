@@ -67,6 +67,12 @@ public sealed class TestHost : IProjectHost, IDialogService
     public Task RescanAsync(string? revealPath = null) => Task.CompletedTask;
     public Task RemoveExtraProjectAsync(string path) => Task.CompletedTask;
 
+    public Task HideProjectAsync(string path)
+    {
+        Settings.SetHidden(path, true);
+        return Task.CompletedTask;
+    }
+
     public Task AssignProjectAsync(string path, GitHubAccount? account)
     {
         Settings.SetProjectAccount(path, account is null ? null : AppSettings.AccountKey(account.Host, account.Login));

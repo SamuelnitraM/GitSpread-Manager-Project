@@ -71,10 +71,13 @@ public abstract partial class TabViewModel : ObservableObject
     public bool IsExplorerOpen => Explorer is not null;
     partial void OnExplorerChanged(HistoryExplorerViewModel? value) => OnPropertyChanged(nameof(IsExplorerOpen));
 
-    private void OnOpenLargeRequested(object? sender, HistoryOpenRequest request)
+    private void OnOpenLargeRequested(object? sender, HistoryOpenRequest request) => OpenExplorer(request.Key, request.Sha);
+
+    /// <summary>Ouvre l'historique en grand sur un projet (par défaut, celui de l'aperçu) et un commit.</summary>
+    public void OpenExplorer(string? key = null, string? sha = null)
     {
         if (History is null) return;
-        Explorer = new HistoryExplorerViewModel(this, History.Host, request.Key ?? ExplorerKey(), request.Sha);
+        Explorer = new HistoryExplorerViewModel(this, History.Host, key ?? ExplorerKey(), sha);
         Explorer.Start();
     }
 

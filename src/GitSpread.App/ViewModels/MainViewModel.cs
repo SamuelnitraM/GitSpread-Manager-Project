@@ -48,6 +48,7 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         _logger = services.LoggerFactory.CreateLogger<MainViewModel>();
         Settings = services.SettingsStore.Load();
         _unlinked.History = NewHistory();
+        DisplayPreferences.Current.Apply(Settings);
         ShowHistoryPreview = Settings.ShowHistoryPreview;
         // 240 : ancienne hauteur par défaut des essais de F6a, remplacée par la hauteur minimale.
         HistoryPreviewHeight = Settings.HistoryPreviewHeight is 240 ? 110 : Math.Max(110, Settings.HistoryPreviewHeight);
@@ -83,6 +84,47 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
 
     [RelayCommand]
     private void ToggleHistoryPreview() => ShowHistoryPreview = !ShowHistoryPreview;
+
+    // ------------------------------------------------------------ paramètres (F6d)
+
+    private readonly HashSet<TabViewModel> _startViewShown = [];
+
+    partial void OnSelectedTabChanged(TabViewModel? value) => ShowStartView(value);
+
+    /// <summary>Vue principale « arborescence » : chaque onglet s'ouvre une fois sur l'historique en grand
+    /// (« Retour aux projets » ramène à la liste, qui reste ensuite affichée).</summary>
+    private void ShowStartView(TabViewModel? tab)
+    {
+        if (tab is null || Settings.MainView != MainViews.History || !_startViewShown.Add(tab) || tab.IsExplorerOpen) return;
+        tab.OpenExplorer();
+    }
+
+    /// <summary>Applique les préférences modifiées dans la fenêtre des paramètres.</summary>
+    public void ApplyPreferences(bool mainViewChanged = false)
+    {
+        DisplayPreferences.Current.Apply(Settings);
+        ShowHistoryPreview = Settings.ShowHistoryPreview;
+        HistoryPreviewHeight = Math.Max(110, Settings.HistoryPreviewHeight);
+        foreach (var tab in Tabs)
+            if (tab.History is { } history) history.PageSize = Settings.HistoryPageSize;
+        if (mainViewChanged)
+        {
+            _startViewShown.Clear();
+            ShowStartView(SelectedTab);
+        }
+        SaveSettings();
+    }
+
+    public Task HideProjectAsync(string path)
+    {
+        Settings.SetHidden(path, true);
+        SaveSettings();
+        DistributeProjects();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Range de nouveau les projets dans les onglets (après avoir réaffiché un projet masqué).</summary>
+    public void RedistributeProjects() => DistributeProjects();
 
     /// <summary>Recharge la liste des repos GitHub d'un compte (après un renommage, une suppression…).</summary>
     public Task ReloadRepositoriesAsync(GitHubAccount account) =>
@@ -374,12 +416,6 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         }
     }
 
-    public void SetTheme(string theme)
-    {
-        Settings.Theme = theme;
-        SaveSettings();
-    }
-
     private void UpdateSwitchAvailability()
     {
         foreach (var tab in AccountTabs) tab.CanSwitch = tab.IsActive && SwitchTargets(tab).Count > 0;
@@ -398,7 +434,8 @@ public sealed partial class MainViewModel : ObservableObject, IProjectHost
         foreach (var tab in AccountTabs)
             foreach (var repo in tab.Collaborations) collaborations.Add(tab.Account, repo.FullName);
 
-        var placements = ProjectClassifier.Classify(_projects, _accounts, collaborations, Settings.ProjectAccount);
+        var visible = _projects.Where(p => !Settings.IsHidden(p.Path)).ToList(); // projets masqués (F6d)
+        var placements = ProjectClassifier.Classify(visible, _accounts, collaborations, Settings.ProjectAccount);
         foreach (var tab in AccountTabs)
             tab.SetProjects(placements
                 .Where(p => p.BelongsTo(tab.Account))
